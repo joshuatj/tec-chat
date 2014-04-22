@@ -1,16 +1,55 @@
 package com.tan_ce.tecingamechat;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.ListIterator;
 
 import android.os.Parcel;
 import android.os.Parcelable;
 
+/**
+ * Represents the chat history cache of the app. Is a parcelable in order
+ * to survive instance saving.
+ * 
+ * @author tan-ce
+ *
+ */
 public class ChatHistory implements Parcelable {
-	protected ArrayList<ChatMessage> history;
+	protected List<ChatMessage> history;
 
 	public ChatMessage get(int idx) { return history.get(idx); }
+	public Iterable<ChatMessage> getIterable() { return history; }
 	public int size() { return history.size(); }
 	public void add(ChatMessage msg) { history.add(msg); }
+	
+	/**
+	 * Merges two lists.
+	 * Note: Involves sorting the entire history. Not recommended to run in the
+	 * UI thread.
+	 * 
+	 * @param c
+	 */
+	public synchronized void mergeHistory(List<ChatMessage> c) {
+		// Append
+		c.addAll(history);
+		
+		// Sort
+		Collections.sort(c, new ChatMessage.ChatMessageComparator());
+		
+		// Eliminate duplicates
+		ChatMessage prev = null;
+		ListIterator<ChatMessage> li = c.listIterator();
+		while(li.hasNext()) {
+			ChatMessage cur = li.next();
+			if (prev != null && cur.getIdx() == prev.getIdx()) {
+				li.remove();
+			}
+			prev = cur;
+		}
+		
+		history = c;
+	}
 	
 	public ChatHistory() {
 		history = new ArrayList<ChatMessage>();
@@ -28,6 +67,7 @@ public class ChatHistory implements Parcelable {
 		
 		// Save each chat message
 		for (ChatMessage cm : history) {
+			dest.writeInt(cm.getIdx());
 			dest.writeString(cm.getUser().toString());
 			dest.writeString(cm.getMessage().toString());
 		}
@@ -41,9 +81,10 @@ public class ChatHistory implements Parcelable {
 		
 		// Read all of the chat messages
 		for (int i = 0; i < size; i++) {
+			int idx = in.readInt();
 			String user = in.readString();
 			String msg = in.readString();
-			history.add(new ChatMessage(user, msg));
+			history.add(new ChatMessage(idx, user, msg));
 		}
 	}
 	

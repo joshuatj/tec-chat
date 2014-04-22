@@ -1,82 +1,63 @@
 package com.tan_ce.tecingamechat;
 
-import java.util.ArrayList;
-
+import java.util.List;
 import android.R.color;
 import android.app.Activity;
-import android.app.ActionBar;
 import android.app.Fragment;
+import android.os.AsyncTask;
 import android.os.Bundle;
-import android.os.Parcel;
-import android.os.Parcelable;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-import android.os.Build;
+import android.widget.Toast;
 
 public class ChatActivity extends Activity {
 	protected ChatHistory history;	
 
-	@Override
-	protected void onCreate(Bundle savedInstanceState) {
-		super.onCreate(savedInstanceState);
-		setContentView(R.layout.activity_chat);
-
-		if (savedInstanceState == null) {
-			history = new ChatHistory();
-			getFragmentManager().beginTransaction()
-					.add(R.id.container, new PlaceholderFragment()).commit();
-		} else {
-			history = savedInstanceState.getParcelable("history");
-		}
+	protected void showToast(String msg) {
+		Toast toast = Toast.makeText(getApplicationContext(), msg, Toast.LENGTH_SHORT);
+		toast.show();
 	}
 	
-	@Override
-	public void onSaveInstanceState(Bundle savedInstanceState) {
-		savedInstanceState.putParcelable("history", history);
-		super.onSaveInstanceState(savedInstanceState);
-	}
-	
-	@Override
-	public void onRestoreInstanceState(Bundle savedInstanceState) {
-		super.onRestoreInstanceState(savedInstanceState);
-		history = savedInstanceState.getParcelable("history");
+	/**
+	 * Run when the user clicks "Send"
+	 * 
+	 * @param view
+	 */
+	public void sendMsg(View view) {
+		showToast("Not ready to send message");
+		/* EditText edit_msg = (EditText) findViewById(R.id.edit_msg);
+		CharSequence msg = edit_msg.getText().toString();
 		
-		LinearLayout layout_msg = (LinearLayout) findViewById(R.id.layout_msg);
-		if (layout_msg.getChildCount() == 0) {
-			for (int i = 0; i < history.size(); i++) {
-				ChatMessage cm = history.get(i);
-				addMsg(cm.getUser(), cm.getMessage());
-			}
-		}
-	}
-
-	@Override
-	public boolean onCreateOptionsMenu(Menu menu) {
-
-		// Inflate the menu; this adds items to the action bar if it is present.
-		getMenuInflater().inflate(R.menu.chat, menu);
-		return true;
-	}
-
-	@Override
-	public boolean onOptionsItemSelected(MenuItem item) {
-		// Handle action bar item clicks here. The action bar will
-		// automatically handle clicks on the Home/Up button, so long
-		// as you specify a parent activity in AndroidManifest.xml.
-		int id = item.getItemId();
-		if (id == R.id.action_settings) {
-			return true;
-		}
-		return super.onOptionsItemSelected(item);
+		addMsg("some_user", msg);
+		history.add(new ChatMessage("some_user", msg));
+		
+		edit_msg.setText(""); */
 	}
 	
+	/**
+	 * Updates the chat view
+	 */
+	protected void updateChatView() {
+		LinearLayout layout_msg = (LinearLayout) findViewById(R.id.layout_msg);
+		layout_msg.removeAllViews();
+		
+		for (ChatMessage cm : history.getIterable()) {
+			addMsg(cm.getUser(), cm.getMessage());
+		}
+	}
+	
+	/**
+	 * Adds a chat bubble to the UI
+	 * 
+	 * @param user
+	 * @param msg
+	 */
 	@SuppressWarnings("deprecation")
 	protected void addMsg(CharSequence user, CharSequence msg) {
 		// Username
@@ -109,16 +90,95 @@ public class ChatActivity extends Activity {
 		((LinearLayout) findViewById(R.id.layout_msg)).addView(msg_layout);
 	}
 	
-	public void sendMsg(View view) {
-		EditText edit_msg = (EditText) findViewById(R.id.edit_msg);
-		CharSequence msg = edit_msg.getText().toString();
+	/**
+	 * doInBackground should be called with the index and number of entries to retrieve.
+	 * If omitted, then the last 50 messages are retrieved.
+	 *  
+	 * It will then retrieve those lines from the server and update the history object.
+	 * 
+	 * On completion, the chat history is updated.
+	 * 
+	 * @author tan-ce
+	 *
+	 */
+	private class HistoryRetriever extends AsyncTask<Integer, Void, Boolean> {
+		@Override
+		protected Boolean doInBackground(Integer... params) {
+			try {
+				ChatServer cs = new ChatServer();
+				List<ChatMessage> ret = cs.getHistory();
+				history.mergeHistory(ret);
+			} catch (Exception e) {
+				e.printStackTrace();
+				return true;
+			}
+			
+			return false;
+		}
 		
-		addMsg("some_user", msg);
-		history.add(new ChatMessage("some_user", msg));
+		@Override
+		protected void onPostExecute(Boolean failed) {
+			if (failed.booleanValue()) {
+				showToast("Failed to retrieve history from server");
+			} else {
+				updateChatView();
+			}
+		}
+	}
+	
+	@Override
+	protected void onCreate(Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
+		setContentView(R.layout.activity_chat);
+
+		if (savedInstanceState == null) {
+			history = new ChatHistory();
+			(new HistoryRetriever()).execute();
+			
+			getFragmentManager().beginTransaction()
+					.add(R.id.container, new PlaceholderFragment()).commit();
+		} else {
+			history = savedInstanceState.getParcelable("history");
+		}
+	}
+	
+	@Override
+	public void onSaveInstanceState(Bundle savedInstanceState) {
+		savedInstanceState.putParcelable("history", history);
+		super.onSaveInstanceState(savedInstanceState);
+	}
+	
+	@Override
+	public void onRestoreInstanceState(Bundle savedInstanceState) {
+		super.onRestoreInstanceState(savedInstanceState);
+		history = savedInstanceState.getParcelable("history");
 		
-		edit_msg.setText("");
+		LinearLayout layout_msg = (LinearLayout) findViewById(R.id.layout_msg);
+		if (layout_msg.getChildCount() == 0) {
+			updateChatView();
+		}
 	}
 
+	@Override
+	public boolean onCreateOptionsMenu(Menu menu) {
+
+		// Inflate the menu; this adds items to the action bar if it is present.
+		getMenuInflater().inflate(R.menu.chat, menu);
+		return true;
+	}
+
+	@Override
+	public boolean onOptionsItemSelected(MenuItem item) {
+		// Handle action bar item clicks here. The action bar will
+		// automatically handle clicks on the Home/Up button, so long
+		// as you specify a parent activity in AndroidManifest.xml.
+		int id = item.getItemId();
+		if (id == R.id.action_settings) {
+			return true;
+		}
+		return super.onOptionsItemSelected(item);
+	}
+	
 	/**
 	 * A placeholder fragment containing a simple view.
 	 */
