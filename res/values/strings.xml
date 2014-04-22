@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">TEC Chat</string>
+    <string name="action_settings">Settings</string>
+    <string name="msg_send">Send</string>
+    <string name="msg_load_prev">Load previous messages</string>
+
+</resources>
