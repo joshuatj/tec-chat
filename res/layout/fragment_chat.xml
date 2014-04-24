@@ -25,7 +25,8 @@
 		            android:layout_width="wrap_content"
 		            android:layout_height="wrap_content"
 		            android:layout_centerInParent="true"
-		            android:text="@string/msg_load_prev" />
+		            android:text="@string/msg_load_prev"
+		            android:onClick="loadPrev" />
 		    </RelativeLayout>
 		    <LinearLayout 
 		        android:id="@+id/layout_msg"

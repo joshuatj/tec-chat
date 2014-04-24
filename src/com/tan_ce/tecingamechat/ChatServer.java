@@ -14,6 +14,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.net.CookieManager;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -26,6 +27,7 @@ import org.json.JSONObject;
  */
 public class ChatServer {
 	public static final String default_api_gateway = "https://minecraft.tan-ce.com:9443/chat/api.php";
+	
 	protected String api_gateway;
 	
 	/**
@@ -93,11 +95,13 @@ public class ChatServer {
 		for (int i = 0; i < jhist.length(); i++) {
 			JSONObject jcm = jhist.getJSONObject(i);
 			
-			int idx = jcm.getInt("idx");
+			int idx = jcm.getInt("id");
 			String user = jcm.getString("user");
 			String msg = jcm.getString("msg");
+			// Java uses milliseconds since the epoch:
+			long date = jcm.getLong("ts") * 1000;
 			
-			hist.add(new ChatMessage(idx, user, msg));
+			hist.add(new ChatMessage(idx, user, msg, date));
 		}
 		
 		return hist;

@@ -16,12 +16,15 @@ import android.os.Parcelable;
  *
  */
 public class ChatHistory implements Parcelable {
+	protected int earliest_idx = Integer.MAX_VALUE;
 	protected List<ChatMessage> history;
 
 	public ChatMessage get(int idx) { return history.get(idx); }
 	public Iterable<ChatMessage> getIterable() { return history; }
 	public int size() { return history.size(); }
 	public void add(ChatMessage msg) { history.add(msg); }
+	
+	public synchronized int getEarliestIdx() { return earliest_idx; }
 	
 	/**
 	 * Merges two lists.
@@ -37,11 +40,17 @@ public class ChatHistory implements Parcelable {
 		// Sort
 		Collections.sort(c, new ChatMessage.ChatMessageComparator());
 		
-		// Eliminate duplicates
+		// Some processing on the whole history
+		earliest_idx = Integer.MAX_VALUE;
 		ChatMessage prev = null;
 		ListIterator<ChatMessage> li = c.listIterator();
 		while(li.hasNext()) {
 			ChatMessage cur = li.next();
+			
+			// Find the smallest index
+			if (cur.getIdx() < earliest_idx) earliest_idx = cur.getIdx();
+			
+			// Look for duplicates
 			if (prev != null && cur.getIdx() == prev.getIdx()) {
 				li.remove();
 			}
@@ -70,6 +79,7 @@ public class ChatHistory implements Parcelable {
 			dest.writeInt(cm.getIdx());
 			dest.writeString(cm.getUser().toString());
 			dest.writeString(cm.getMessage().toString());
+			dest.writeLong(cm.getTimestamp());
 		}
 	}
 	
@@ -84,7 +94,8 @@ public class ChatHistory implements Parcelable {
 			int idx = in.readInt();
 			String user = in.readString();
 			String msg = in.readString();
-			history.add(new ChatMessage(idx, user, msg));
+			long date = in.readLong();
+			history.add(new ChatMessage(idx, user, msg, date));
 		}
 	}
 	
