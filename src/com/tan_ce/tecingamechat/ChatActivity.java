@@ -22,7 +22,7 @@ import android.widget.Toast;
 
 public class ChatActivity extends Activity {
 	protected static SimpleDateFormat timeFormat = new SimpleDateFormat("hh:mm aaa", Locale.getDefault());
-	protected static SimpleDateFormat dateFormat = new SimpleDateFormat("d LLL", Locale.getDefault());
+	protected static SimpleDateFormat dateFormat = new SimpleDateFormat("d LLL yyyy", Locale.getDefault());
 	protected ChatHistory history;
 
 	protected void showToast(String msg) {
@@ -31,7 +31,26 @@ public class ChatActivity extends Activity {
 	}
 	
 	public void loadPrev(View view) {
-		showToast("!!");
+		if (history.earliestIdx == Integer.MAX_VALUE) {
+			showToast("Loading...");
+			return;
+		}
+		
+		(new HistoryUpdator<Integer>() {
+			@Override
+			protected Boolean doInBackground(Integer... params) {
+				try {
+					ChatServer cs = new ChatServer();
+					List<ChatMessage> ret = cs.getHistory(history.earliestIdx - 50, 50);
+					history.mergeHistory(ret);
+				} catch (Exception e) {
+					e.printStackTrace();
+					return true;
+				}
+				
+				return false;
+			}
+		}).execute();
 	}
 	
 	/**
@@ -56,7 +75,26 @@ public class ChatActivity extends Activity {
 	 * @param menu
 	 */
 	public void refreshHistory(MenuItem menu) {
-		(new HistoryRetriever()).execute();
+		if (history.nextIdx == 0) {
+			showToast("Loading...");
+			return;
+		}
+		
+		(new HistoryUpdator<Integer>() {
+			@Override
+			protected Boolean doInBackground(Integer... params) {
+				try {
+					ChatServer cs = new ChatServer();
+					List<ChatMessage> ret = cs.getHistory(history.nextIdx, 50);
+					history.mergeHistory(ret);
+				} catch (Exception e) {
+					e.printStackTrace();
+					return true;
+				}
+				
+				return false;
+			}
+		}).execute();
 	}
 	
 	/**
@@ -73,7 +111,7 @@ public class ChatActivity extends Activity {
 			// Check if it's a different day
 			Calendar curMsgTs = Calendar.getInstance();
 			curMsgTs.setTimeInMillis(cm.getTimestamp());
-			if (	(curMsgTs.get(Calendar.YEAR) != lastMsgTs.get(Calendar.YEAR)) &&
+			if (	(curMsgTs.get(Calendar.YEAR) != lastMsgTs.get(Calendar.YEAR)) ||
 					(curMsgTs.get(Calendar.DAY_OF_YEAR) != lastMsgTs.get(Calendar.DAY_OF_YEAR))) {
 				addNaked(dateFormat.format(cm.getTimestamp()) + ":");
 			}
@@ -180,7 +218,7 @@ public class ChatActivity extends Activity {
 	protected void addNaked(String msg) {
 		TextView tv_msg = new TextView(this);
 		tv_msg.setText(msg);
-		tv_msg.setTextSize(11);
+		tv_msg.setTextSize(13);
 		
 		// Set layout
 		LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
@@ -194,56 +232,30 @@ public class ChatActivity extends Activity {
 		((LinearLayout) findViewById(R.id.layout_msg)).addView(tv_msg);
 	}
 	
-	/**
-	 * doInBackground should be called with the index and number of entries to retrieve.
-	 * If omitted, then the last 50 messages are retrieved.
-	 *  
-	 * It will then retrieve those lines from the server and update the history object.
-	 * 
-	 * On completion, the chat history is updated.
-	 * 
-	 * @author tan-ce
-	 *
-	 */
-	private class HistoryRetriever extends AsyncTask<Integer, Void, Boolean> {
-		@Override
-		protected Boolean doInBackground(Integer... params) {
-			try {
-				ChatServer cs = new ChatServer();
-				List<ChatMessage> ret = cs.getHistory();
-				history.mergeHistory(ret);
-			} catch (Exception e) {
-				e.printStackTrace();
-				return true;
-			}
-			
-			return false;
-		}
-		
-		@Override
-		protected void onPostExecute(Boolean failed) {
-			if (failed.booleanValue()) {
-				showToast("Failed to retrieve history from server");
-			} else {
-				updateChatView();
-			}
-		}
-	}
-	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_chat);
 
 		if (savedInstanceState == null) {
-			// We need to initialize the char history. First find out the 
-			// next chat index to prime the ChatHistory
-			// TODO
-			// AsyncTask lastIndexGetter = new AsyncTask
-			
 			history = new ChatHistory();
 			
-			(new HistoryRetriever()).execute();
+			// Prime the history with the latest entries
+			(new HistoryUpdator<Integer>() {
+				@Override
+				protected Boolean doInBackground(Integer... params) {
+					try {
+						ChatServer cs = new ChatServer();
+						List<ChatMessage> ret = cs.getHistory();
+						history.mergeHistory(ret);
+					} catch (Exception e) {
+						e.printStackTrace();
+						return true;
+					}
+					
+					return false;
+				}
+			}).execute();
 			
 			getFragmentManager().beginTransaction()
 					.add(R.id.container, new PlaceholderFragment()).commit();
@@ -306,4 +318,14 @@ public class ChatActivity extends Activity {
 		}
 	}
 
+	protected abstract class HistoryUpdator<T> extends AsyncTask<T, Void, Boolean> {
+		@Override
+		protected void onPostExecute(Boolean failed) {
+			if (failed.booleanValue()) {
+				showToast("Failed to retrieve history from server");
+			} else {
+				updateChatView();
+			}
+		}
+	}
 }

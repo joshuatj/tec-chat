@@ -16,15 +16,14 @@ import android.os.Parcelable;
  *
  */
 public class ChatHistory implements Parcelable {
-	protected int earliest_idx = Integer.MAX_VALUE;
+	public int earliestIdx = Integer.MAX_VALUE;
+	public int nextIdx = 0;
 	protected List<ChatMessage> history;
 
 	public ChatMessage get(int idx) { return history.get(idx); }
 	public Iterable<ChatMessage> getIterable() { return history; }
 	public int size() { return history.size(); }
 	public void add(ChatMessage msg) { history.add(msg); }
-	
-	public synchronized int getEarliestIdx() { return earliest_idx; }
 	
 	/**
 	 * Merges two lists.
@@ -39,16 +38,14 @@ public class ChatHistory implements Parcelable {
 		
 		// Sort
 		Collections.sort(c, new ChatMessage.ChatMessageComparator());
+		earliestIdx = c.get(0).getIdx();
+		nextIdx = c.get(c.size() - 1).getIdx();
 		
 		// Some processing on the whole history
-		earliest_idx = Integer.MAX_VALUE;
 		ChatMessage prev = null;
 		ListIterator<ChatMessage> li = c.listIterator();
 		while(li.hasNext()) {
 			ChatMessage cur = li.next();
-			
-			// Find the smallest index
-			if (cur.getIdx() < earliest_idx) earliest_idx = cur.getIdx();
 			
 			// Look for duplicates
 			if (prev != null && cur.getIdx() == prev.getIdx()) {

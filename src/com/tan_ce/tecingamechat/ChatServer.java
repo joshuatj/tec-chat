@@ -67,13 +67,13 @@ public class ChatServer {
 	}
 	
 	/**
-	 * Retrieves chat message history
+	 * Handles the result of a history request
 	 * 
+	 * @param url
 	 * @return
-	 * @throws Exception 
+	 * @throws Exception
 	 */
-	public List<ChatMessage> getHistory() throws Exception {
-		URL url = urlBuilder("history");
+	protected List<ChatMessage> historyRequest(URL url) throws Exception {
 		HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 		String json_str;
 		
@@ -105,5 +105,31 @@ public class ChatServer {
 		}
 		
 		return hist;
+	}
+	
+	/**
+	 * Retrieves most recent chat message history
+	 * 
+	 * @return
+	 * @throws Exception 
+	 */
+	public List<ChatMessage> getHistory() throws Exception {
+		URL url = urlBuilder("history");
+		return historyRequest(url);
+	}
+	
+	/**
+	 * Retrieves chat message history
+	 * 
+	 * @return
+	 * @throws Exception 
+	 */
+	public List<ChatMessage> getHistory(int startIdx, int count) throws Exception {
+		HashMap<String, String> params = new HashMap<String, String>();
+		params.put("id", Integer.toString(startIdx));
+		params.put("count", Integer.toString(count));
+		
+		URL url = urlBuilder("history", params);
+		return historyRequest(url);
 	}
 }
