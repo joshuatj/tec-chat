@@ -5,6 +5,9 @@ import java.util.Calendar;
 import java.util.List;
 import java.util.Locale;
 
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GooglePlayServicesUtil;
+
 import android.R.color;
 import android.app.Activity;
 import android.app.Fragment;
@@ -88,7 +91,8 @@ public class ChatActivity extends Activity {
 	}
 	
 	protected int getChatScrollOffset() {
-		return findViewById(R.id.show_more).getHeight() + 14;
+		return findViewById(R.id.chat_container).getTop() +
+				findViewById(R.id.chat_layout).getTop();
 	}
 	
 	/**
@@ -119,22 +123,32 @@ public class ChatActivity extends Activity {
 		}).execute();
 	}
 	
+	protected ChatMessage viewToChatMessage(View v) {
+		if (v instanceof ChatMessageUI) {
+			return ((ChatMessageUI) v).chatMessage;
+		} else if (v instanceof TextView) {
+			TextView tv = (TextView) v;
+			if ((tv.getTag() instanceof ChatMessage)) {
+				return (ChatMessage) tv.getTag();
+			}
+		}
+		return null;
+	}
+	
 	/**
 	 * Get the topmost chat message in view
 	 */
 	protected ChatMessage getVisibleChat() {
 		ScrollView sl = (ScrollView) findViewById(R.id.chat_scroller);
-		int scrollPos = sl.getScrollY();
-		scrollPos -= getChatScrollOffset();
+		int scrollPos = sl.getScrollY() 
+				- getChatScrollOffset() - 5 /* margin for error */;
 		
 		LinearLayout cc = (LinearLayout) findViewById(R.id.chat_container);
 		for (int i = 0; i < cc.getChildCount(); i++) {
 			View v = cc.getChildAt(i);
-			if (v instanceof ChatMessageUI) {
-				ChatMessageUI cmui = (ChatMessageUI) v;
-				if (cmui.getTop() > scrollPos) {
-					return cmui.chatMessage;
-				}
+			ChatMessage cm = viewToChatMessage(v);
+			if (v.getTop() > scrollPos && cm != null) {
+				return cm;
 			}
 		}
 		
@@ -150,7 +164,8 @@ public class ChatActivity extends Activity {
 		LinearLayout cc = (LinearLayout) findViewById(R.id.chat_container);
 		for (int i = 0; i < cc.getChildCount(); i++) {
 			View v = cc.getChildAt(i);
-			if (v instanceof ChatMessageUI) {
+			ChatMessage cm = viewToChatMessage(v);
+			if (cm != null && cm.getIdx() == idx) {
 				return v.getTop() + offset;
 			}
 		}
@@ -176,16 +191,17 @@ public class ChatActivity extends Activity {
 				return;
 			}
 			
+			int offset = getChatScrollOffset();
+			
 			LinearLayout cc = (LinearLayout) findViewById(R.id.chat_container);
 			for (int i = 0; i < cc.getChildCount(); i++) {
 				View v = cc.getChildAt(i);
-				if (v instanceof ChatMessageUI) {
-					ChatMessageUI cmui = (ChatMessageUI) v;
-					if (cmui.chatMessage.getIdx() == idx) {
-						ScrollView sl = (ScrollView) findViewById(R.id.chat_scroller);
-						sl.scrollTo(sl.getScrollX(), cmui.getTop());
-						return;
-					}
+				ChatMessage cm = viewToChatMessage(v);
+				
+				if (cm != null && cm.getIdx() == idx) {
+					ScrollView sl = (ScrollView) findViewById(R.id.chat_scroller);
+					sl.scrollTo(sl.getScrollX(), v.getTop() + offset);
+					return;
 				}
 			}
 		}
@@ -307,6 +323,9 @@ public class ChatActivity extends Activity {
 				getResources().getDisplayMetrics());
 		tv_msg.setLayoutParams(lp);
 		
+		// Create reference to the original ChatMessage
+		tv_msg.setTag(cm);
+		
 		// Add 'em in
 		((LinearLayout) findViewById(R.id.chat_container)).addView(tv_msg);
 	}
@@ -333,9 +352,14 @@ public class ChatActivity extends Activity {
 	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
-		super.onCreate(savedInstanceState);
+		super.onCreate(savedInstanceState);		
 		setContentView(R.layout.activity_chat);
 
+		if (!checkPlayServices()) {
+			showToast("This app requires Google Play Services");
+			return;
+		}
+		
 		if (savedInstanceState == null) {
 			history = new ChatHistory();
 			
@@ -360,6 +384,7 @@ public class ChatActivity extends Activity {
 					if (failed.booleanValue()) {
 						showToast("Failed to retrieve history from server");
 					} else {
+						// Update the view and show the most recent messages
 						updateChatView();
 						new Handler().post(new ChatScroller(history.nextIdx - 1));
 					}
@@ -379,7 +404,9 @@ public class ChatActivity extends Activity {
 		
 		ChatMessage cm = getVisibleChat();
 		int curIdx = -1;
-		if (cm != null) curIdx = cm.getIdx();
+		if (cm != null) {
+			curIdx = cm.getIdx();
+		}
 		savedInstanceState.putInt("curIdx", curIdx);
 		
 		super.onSaveInstanceState(savedInstanceState);
@@ -400,8 +427,7 @@ public class ChatActivity extends Activity {
 	}
 
 	@Override
-	public boolean onCreateOptionsMenu(Menu menu) {
-
+	public boolean onCreateOptionsMenu(Menu menu) {		
 		// Inflate the menu; this adds items to the action bar if it is present.
 		getMenuInflater().inflate(R.menu.chat, menu);
 		return true;
@@ -466,5 +492,25 @@ public class ChatActivity extends Activity {
 			super(context);
 			chatMessage = cm;
 		}
+	}
+	
+	/**
+	 * Check the device to make sure it has the Google Play Services APK. If
+	 * it doesn't, display a dialog that allows users to download the APK from
+	 * the Google Play Store or enable it in the device's system settings.
+	 */
+	private boolean checkPlayServices() {
+	    int resultCode = GooglePlayServicesUtil.isGooglePlayServicesAvailable(this);
+	    if (resultCode != ConnectionResult.SUCCESS) {
+	        if (GooglePlayServicesUtil.isUserRecoverableError(resultCode)) {
+	            GooglePlayServicesUtil.getErrorDialog(resultCode, this,
+	                    9000).show();
+	        } else {
+	            Log.w("GCM Check", "This device is not supported.");
+	            finish();
+	        }
+	        return false;
+	    }
+	    return true;
 	}
 }
