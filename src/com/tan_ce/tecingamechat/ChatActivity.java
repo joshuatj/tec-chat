@@ -8,8 +8,11 @@ import java.util.Locale;
 import android.R.color;
 import android.app.Activity;
 import android.app.Fragment;
+import android.content.Context;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -17,6 +20,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -59,7 +63,21 @@ public class ChatActivity extends Activity {
 	 * @param view
 	 */
 	public void sendMsg(View view) {
-		showToast("Not ready to send message");
+
+		
+		/* ScrollView sl = (ScrollView) findViewById(R.id.chat_scroller);
+		int scrollPos = sl.getScrollY();
+		
+		for (ChatMessage cm : history.getIterable()) {
+			if (cm.top > scrollPos) {
+				showToast(cm.getMessage().toString());
+			}
+		} */
+		
+		/* 
+		showToast(Integer.toString(sl.getScrollY())); */
+		
+		//showToast("Not ready to send message");
 		/* EditText edit_msg = (EditText) findViewById(R.id.edit_msg);
 		CharSequence msg = edit_msg.getText().toString();
 		
@@ -67,6 +85,10 @@ public class ChatActivity extends Activity {
 		history.add(new ChatMessage("some_user", msg));
 		
 		edit_msg.setText(""); */
+	}
+	
+	protected int getChatScrollOffset() {
+		return findViewById(R.id.show_more).getHeight() + 14;
 	}
 	
 	/**
@@ -98,10 +120,83 @@ public class ChatActivity extends Activity {
 	}
 	
 	/**
+	 * Get the topmost chat message in view
+	 */
+	protected ChatMessage getVisibleChat() {
+		ScrollView sl = (ScrollView) findViewById(R.id.chat_scroller);
+		int scrollPos = sl.getScrollY();
+		scrollPos -= getChatScrollOffset();
+		
+		LinearLayout cc = (LinearLayout) findViewById(R.id.chat_container);
+		for (int i = 0; i < cc.getChildCount(); i++) {
+			View v = cc.getChildAt(i);
+			if (v instanceof ChatMessageUI) {
+				ChatMessageUI cmui = (ChatMessageUI) v;
+				if (cmui.getTop() > scrollPos) {
+					return cmui.chatMessage;
+				}
+			}
+		}
+		
+		return null;
+	}
+	
+	/**
+	 * Given a chat index, get its position in the scrollable region
+	 */
+	protected int getChatTop(int idx) {
+		int offset = getChatScrollOffset();
+		
+		LinearLayout cc = (LinearLayout) findViewById(R.id.chat_container);
+		for (int i = 0; i < cc.getChildCount(); i++) {
+			View v = cc.getChildAt(i);
+			if (v instanceof ChatMessageUI) {
+				return v.getTop() + offset;
+			}
+		}
+		
+		return -1;
+	}
+	
+	/**
+	 * Scrolls the chat view to the message with the given index 
+	 * @param cm
+	 */
+	protected class ChatScroller implements Runnable {
+		protected int idx;
+		
+		ChatScroller(int chatIdx) {
+			idx = chatIdx;
+		}
+		
+		@Override
+		public void run() {
+			if (idx < 0) {
+				Log.w("ChatScroller", "Invoked with index < 0");
+				return;
+			}
+			
+			LinearLayout cc = (LinearLayout) findViewById(R.id.chat_container);
+			for (int i = 0; i < cc.getChildCount(); i++) {
+				View v = cc.getChildAt(i);
+				if (v instanceof ChatMessageUI) {
+					ChatMessageUI cmui = (ChatMessageUI) v;
+					if (cmui.chatMessage.getIdx() == idx) {
+						ScrollView sl = (ScrollView) findViewById(R.id.chat_scroller);
+						sl.scrollTo(sl.getScrollX(), cmui.getTop());
+						return;
+					}
+				}
+			}
+		}
+		
+	}
+	
+	/**
 	 * Updates the chat view
 	 */
 	protected void updateChatView() {
-		LinearLayout layout_msg = (LinearLayout) findViewById(R.id.layout_msg);
+		LinearLayout layout_msg = (LinearLayout) findViewById(R.id.chat_container);
 		layout_msg.removeAllViews();
 		
 		Calendar lastMsgTs = Calendar.getInstance();
@@ -169,7 +264,7 @@ public class ChatActivity extends Activity {
 		tv_msg.setTextSize(15);
 		
 		// The parent layout
-		LinearLayout msg_layout = new LinearLayout(this);
+		LinearLayout msg_layout = (LinearLayout) (new ChatMessageUI(cm, this));
 		msg_layout.setOrientation(LinearLayout.VERTICAL);
 		msg_layout.setBackgroundDrawable(getResources().getDrawable(R.drawable.msg_bubble));
 		msg_layout.addView(msg_header);
@@ -184,7 +279,8 @@ public class ChatActivity extends Activity {
 		msg_layout.setLayoutParams(lp);
 		
 		// Add 'em in
-		((LinearLayout) findViewById(R.id.layout_msg)).addView(msg_layout);
+		LinearLayout chat_container = (LinearLayout) findViewById(R.id.chat_container);
+		chat_container.addView(msg_layout);
 	}
 	
 	/**
@@ -212,9 +308,12 @@ public class ChatActivity extends Activity {
 		tv_msg.setLayoutParams(lp);
 		
 		// Add 'em in
-		((LinearLayout) findViewById(R.id.layout_msg)).addView(tv_msg);
+		((LinearLayout) findViewById(R.id.chat_container)).addView(tv_msg);
 	}
 	
+	/**
+	 * Add un-styled text to the chat view
+	 */
 	protected void addNaked(String msg) {
 		TextView tv_msg = new TextView(this);
 		tv_msg.setText(msg);
@@ -229,7 +328,7 @@ public class ChatActivity extends Activity {
 		tv_msg.setLayoutParams(lp);
 		
 		// Add 'em in
-		((LinearLayout) findViewById(R.id.layout_msg)).addView(tv_msg);
+		((LinearLayout) findViewById(R.id.chat_container)).addView(tv_msg);
 	}
 	
 	@Override
@@ -241,7 +340,7 @@ public class ChatActivity extends Activity {
 			history = new ChatHistory();
 			
 			// Prime the history with the latest entries
-			(new HistoryUpdator<Integer>() {
+			(new AsyncTask<Integer, Void, Boolean>() {
 				@Override
 				protected Boolean doInBackground(Integer... params) {
 					try {
@@ -255,6 +354,16 @@ public class ChatActivity extends Activity {
 					
 					return false;
 				}
+				
+				@Override
+				protected void onPostExecute(Boolean failed) {
+					if (failed.booleanValue()) {
+						showToast("Failed to retrieve history from server");
+					} else {
+						updateChatView();
+						new Handler().post(new ChatScroller(history.nextIdx - 1));
+					}
+				}
 			}).execute();
 			
 			getFragmentManager().beginTransaction()
@@ -267,18 +376,27 @@ public class ChatActivity extends Activity {
 	@Override
 	public void onSaveInstanceState(Bundle savedInstanceState) {
 		savedInstanceState.putParcelable("history", history);
+		
+		ChatMessage cm = getVisibleChat();
+		int curIdx = -1;
+		if (cm != null) curIdx = cm.getIdx();
+		savedInstanceState.putInt("curIdx", curIdx);
+		
 		super.onSaveInstanceState(savedInstanceState);
 	}
 	
 	@Override
 	public void onRestoreInstanceState(Bundle savedInstanceState) {
-		super.onRestoreInstanceState(savedInstanceState);
+		super.onRestoreInstanceState(savedInstanceState);		
 		history = savedInstanceState.getParcelable("history");
 		
-		LinearLayout layout_msg = (LinearLayout) findViewById(R.id.layout_msg);
+		LinearLayout layout_msg = (LinearLayout) findViewById(R.id.chat_container);
 		if (layout_msg.getChildCount() == 0) {
 			updateChatView();
 		}
+		
+		int curIdx = savedInstanceState.getInt("curIdx");
+		new Handler().post(new ChatScroller(curIdx));
 	}
 
 	@Override
@@ -318,14 +436,35 @@ public class ChatActivity extends Activity {
 		}
 	}
 
+	/**
+	 * Abstract class used to update the history and subsequently the UI
+	 */
 	protected abstract class HistoryUpdator<T> extends AsyncTask<T, Void, Boolean> {
+		int lastIdx;
+		
+		protected void onPreExecute() {
+			lastIdx = history.earliestIdx;
+		}
+		
 		@Override
 		protected void onPostExecute(Boolean failed) {
 			if (failed.booleanValue()) {
 				showToast("Failed to retrieve history from server");
 			} else {
 				updateChatView();
+				new Handler().post(new ChatScroller(lastIdx));
 			}
+		}
+	}
+	
+	/**
+	 * A LinearLayout with a reference to the original chat message
+	 */
+	protected class ChatMessageUI extends LinearLayout {
+		public ChatMessage chatMessage;
+		ChatMessageUI(ChatMessage cm, Context context) {
+			super(context);
+			chatMessage = cm;
 		}
 	}
 }

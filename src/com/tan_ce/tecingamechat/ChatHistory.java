@@ -39,7 +39,7 @@ public class ChatHistory implements Parcelable {
 		// Sort
 		Collections.sort(c, new ChatMessage.ChatMessageComparator());
 		earliestIdx = c.get(0).getIdx();
-		nextIdx = c.get(c.size() - 1).getIdx();
+		nextIdx = c.get(c.size() - 1).getIdx() + 1;
 		
 		// Some processing on the whole history
 		ChatMessage prev = null;
@@ -94,6 +94,10 @@ public class ChatHistory implements Parcelable {
 			long date = in.readLong();
 			history.add(new ChatMessage(idx, user, msg, date));
 		}
+		
+		// Set the min and max
+		earliestIdx = history.get(0).getIdx();
+		nextIdx = history.get(history.size() - 1).getIdx() + 1;
 	}
 	
 	public static final Parcelable.Creator<ChatHistory> CREATOR
