@@ -5,13 +5,11 @@ import java.util.Calendar;
 import java.util.List;
 import java.util.Locale;
 
-import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.GooglePlayServicesUtil;
-
 import android.R.color;
 import android.app.Activity;
 import android.app.Fragment;
 import android.content.Context;
+import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
@@ -27,10 +25,15 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GooglePlayServicesUtil;
+
 public class ChatActivity extends Activity {
 	protected static SimpleDateFormat timeFormat = new SimpleDateFormat("hh:mm aaa", Locale.getDefault());
 	protected static SimpleDateFormat dateFormat = new SimpleDateFormat("d LLL yyyy", Locale.getDefault());
+	
 	protected ChatHistory history;
+	protected ChatServer server;
 
 	protected void showToast(String msg) {
 		Toast toast = Toast.makeText(getApplicationContext(), msg, Toast.LENGTH_SHORT);
@@ -43,12 +46,11 @@ public class ChatActivity extends Activity {
 			return;
 		}
 		
-		(new HistoryUpdator<Integer>() {
+		(new HistoryUpdator<Integer>(history.earliestIdx) {
 			@Override
 			protected Boolean doInBackground(Integer... params) {
 				try {
-					ChatServer cs = new ChatServer();
-					List<ChatMessage> ret = cs.getHistory(history.earliestIdx - 50, 50);
+					List<ChatMessage> ret = server.getHistory(history.earliestIdx - 50, 50);
 					history.mergeHistory(ret);
 				} catch (Exception e) {
 					e.printStackTrace();
@@ -106,12 +108,11 @@ public class ChatActivity extends Activity {
 			return;
 		}
 		
-		(new HistoryUpdator<Integer>() {
+		(new HistoryUpdator<Integer>(history.nextIdx - 1) {
 			@Override
 			protected Boolean doInBackground(Integer... params) {
 				try {
-					ChatServer cs = new ChatServer();
-					List<ChatMessage> ret = cs.getHistory(history.nextIdx, 50);
+					List<ChatMessage> ret = server.getHistory(history.nextIdx, 50);
 					history.mergeHistory(ret);
 				} catch (Exception e) {
 					e.printStackTrace();
@@ -360,6 +361,10 @@ public class ChatActivity extends Activity {
 			return;
 		}
 		
+		server = new ChatServer();
+		
+		// doLogin();
+		
 		if (savedInstanceState == null) {
 			history = new ChatHistory();
 			
@@ -368,8 +373,7 @@ public class ChatActivity extends Activity {
 				@Override
 				protected Boolean doInBackground(Integer... params) {
 					try {
-						ChatServer cs = new ChatServer();
-						List<ChatMessage> ret = cs.getHistory();
+						List<ChatMessage> ret = server.getHistory();
 						history.mergeHistory(ret);
 					} catch (Exception e) {
 						e.printStackTrace();
@@ -395,7 +399,7 @@ public class ChatActivity extends Activity {
 					.add(R.id.container, new PlaceholderFragment()).commit();
 		} else {
 			history = savedInstanceState.getParcelable("history");
-		}
+		} // */
 	}
 	
 	@Override
@@ -416,6 +420,7 @@ public class ChatActivity extends Activity {
 	public void onRestoreInstanceState(Bundle savedInstanceState) {
 		super.onRestoreInstanceState(savedInstanceState);		
 		history = savedInstanceState.getParcelable("history");
+		server = new ChatServer();
 		
 		LinearLayout layout_msg = (LinearLayout) findViewById(R.id.chat_container);
 		if (layout_msg.getChildCount() == 0) {
@@ -466,10 +471,10 @@ public class ChatActivity extends Activity {
 	 * Abstract class used to update the history and subsequently the UI
 	 */
 	protected abstract class HistoryUpdator<T> extends AsyncTask<T, Void, Boolean> {
-		int lastIdx;
+		int scrollIdx;
 		
-		protected void onPreExecute() {
-			lastIdx = history.earliestIdx;
+		HistoryUpdator(int scrollIdx) {
+			this.scrollIdx = scrollIdx;
 		}
 		
 		@Override
@@ -478,7 +483,7 @@ public class ChatActivity extends Activity {
 				showToast("Failed to retrieve history from server");
 			} else {
 				updateChatView();
-				new Handler().post(new ChatScroller(lastIdx));
+				new Handler().post(new ChatScroller(scrollIdx));
 			}
 		}
 	}
@@ -499,7 +504,7 @@ public class ChatActivity extends Activity {
 	 * it doesn't, display a dialog that allows users to download the APK from
 	 * the Google Play Store or enable it in the device's system settings.
 	 */
-	private boolean checkPlayServices() {
+	protected boolean checkPlayServices() {
 	    int resultCode = GooglePlayServicesUtil.isGooglePlayServicesAvailable(this);
 	    if (resultCode != ConnectionResult.SUCCESS) {
 	        if (GooglePlayServicesUtil.isUserRecoverableError(resultCode)) {
@@ -513,4 +518,11 @@ public class ChatActivity extends Activity {
 	    }
 	    return true;
 	}
+	
+	protected void doLogin() {
+		Intent loginIntent = new Intent(this, LoginActivity.class);
+		startActivity(loginIntent);
+		finish();
+	}
+
 }
