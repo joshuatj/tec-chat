@@ -361,9 +361,12 @@ public class ChatActivity extends Activity {
 			return;
 		}
 		
-		server = new ChatServer();
-		
-		// doLogin();
+		try {
+			server = new ChatServer(this);
+		} catch (NeedRegistrationException e) {
+			doLogin();
+			return;
+		}
 		
 		if (savedInstanceState == null) {
 			history = new ChatHistory();
@@ -420,7 +423,12 @@ public class ChatActivity extends Activity {
 	public void onRestoreInstanceState(Bundle savedInstanceState) {
 		super.onRestoreInstanceState(savedInstanceState);		
 		history = savedInstanceState.getParcelable("history");
-		server = new ChatServer();
+		try {
+			server = new ChatServer(this);
+		} catch (NeedRegistrationException e) {
+			doLogin();
+			return;
+		}
 		
 		LinearLayout layout_msg = (LinearLayout) findViewById(R.id.chat_container);
 		if (layout_msg.getChildCount() == 0) {

@@ -8,13 +8,16 @@ import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.Toast;
 
 /**
  * Activity which displays a login screen to the user, offering registration as
@@ -37,6 +40,11 @@ public class LoginActivity extends Activity {
 	private View mLoginStatusView;
 	private TextView mLoginStatusMessageView;
 
+	protected void showToast(String msg) {
+		Toast toast = Toast.makeText(getApplicationContext(), msg, Toast.LENGTH_SHORT);
+		toast.show();
+	}
+	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -125,7 +133,7 @@ public class LoginActivity extends Activity {
 			// perform the user login attempt.
 			mLoginStatusMessageView.setText(R.string.login_progress_signing_in);
 			showProgress(true);
-			mAuthTask = new UserLoginTask(new Intent(this, ChatActivity.class));
+			mAuthTask = new UserLoginTask(this, new Intent(this, ChatActivity.class));
 			mAuthTask.execute((Void) null);
 		}
 	}
@@ -177,14 +185,20 @@ public class LoginActivity extends Activity {
 	 */
 	public class UserLoginTask extends AsyncTask<Void, Void, String> {
 		Intent successIntent;
+		Activity ctx;
 		
-		UserLoginTask(Intent successIntent) {
+		UserLoginTask(Activity ctx, Intent successIntent) {
 			this.successIntent = successIntent;
+			this.ctx = ctx;
 		}
 		
 		@Override
 		protected String doInBackground(Void... params) {
-			// TODO: attempt authentication against a network service.
+			try {
+				ChatServer.registerUser(ctx, mEmail, mPassword);
+			} catch (Exception e) {
+				return e.getMessage();
+			}
 
 			return null;
 		}
@@ -195,10 +209,17 @@ public class LoginActivity extends Activity {
 			showProgress(false);
 
 			if (errorMsg == null) {
-				startActivity(successIntent);
-				finish();
+				new Handler().post(new Runnable() {
+					final Activity activity = ctx;
+					@Override
+					public void run() {
+						activity.startActivity(successIntent);
+						activity.finish();	
+					}
+				});
 			} else {
-				
+				Log.e("ChatServer", errorMsg);
+				showToast(errorMsg);
 			}
 		}
 
