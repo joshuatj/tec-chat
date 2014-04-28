@@ -48,7 +48,7 @@
             </intent-filter>
         </receiver>
 
-        <service android:name="com.tan_ce.tecingamechat.GcmIntentService" />
+        <service android:name="com.tan_ce.tecingamechat.ChatIntentService" />
 
         <activity
             android:name="com.tan_ce.tecingamechat.LoginActivity"
