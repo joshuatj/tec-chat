@@ -252,6 +252,34 @@ public class ChatServer {
 		return hist;
 	}
 
+	public void sendMsg(String msg) throws Exception {
+		HashMap<String, String> postData = new HashMap<String, String>();
+		postData.put("msg", msg);
+
+		URL url = urlBuilder("say");
+		HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+
+		String json_str;
+		try {
+			conn.setDoOutput(true);
+
+			OutputStream os = conn.getOutputStream();
+			BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(os, "UTF-8"));
+			writer.write(postEncoder(postData));
+			writer.close();
+
+			InputStream is = conn.getInputStream();
+			BufferedReader reader = new BufferedReader(new InputStreamReader(is, "UTF-8"), 8);
+			json_str = reader.readLine();
+		} finally {
+			conn.disconnect();
+		}
+
+		// Check the returned data for errors
+		JSONObject result = new JSONObject(json_str);
+		checkError(result);
+	}
+
 	/**
 	 * Retrieves most recent chat message history
 	 * 

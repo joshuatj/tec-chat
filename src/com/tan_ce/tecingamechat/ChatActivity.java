@@ -8,8 +8,11 @@ import java.util.Locale;
 import android.R.color;
 import android.app.Activity;
 import android.app.Fragment;
+import android.app.NotificationManager;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
@@ -20,6 +23,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -68,28 +72,33 @@ public class ChatActivity extends Activity {
 	 * @param view
 	 */
 	public void sendMsg(View view) {
+		EditText edit_msg = (EditText) findViewById(R.id.edit_msg);
+		String msg = edit_msg.getText().toString();
 
+		if (msg.isEmpty()) return;
 
-		/* ScrollView sl = (ScrollView) findViewById(R.id.chat_scroller);
-		int scrollPos = sl.getScrollY();
-
-		for (ChatMessage cm : history.getIterable()) {
-			if (cm.top > scrollPos) {
-				showToast(cm.getMessage().toString());
+		new AsyncTask<String, Void, String>() {
+			@Override
+			protected String doInBackground(String... params) {
+				try {
+					server.sendMsg(params[0]);
+				} catch (Exception e) {
+					return e.getMessage();
+				}
+				return null;
 			}
-		} */
 
-		/*
-		showToast(Integer.toString(sl.getScrollY())); */
+			@Override
+			protected void onPostExecute(final String errorMsg) {
+				if (errorMsg != null) {
+					Log.e("ChatServer", errorMsg);
+					showToast("Could not send message: " + errorMsg);
+				}
+			}
 
-		//showToast("Not ready to send message");
-		/* EditText edit_msg = (EditText) findViewById(R.id.edit_msg);
-		CharSequence msg = edit_msg.getText().toString();
+		}.execute(msg);
 
-		addMsg("some_user", msg);
-		history.add(new ChatMessage("some_user", msg));
-
-		edit_msg.setText(""); */
+		edit_msg.setText("");
 	}
 
 	protected int getChatScrollOffset() {
@@ -458,6 +467,26 @@ public class ChatActivity extends Activity {
 	}
 
 	@Override
+	public void onPause() {
+		super.onPause();
+		unregisterReceiver(chatReceiver);
+	}
+
+	@Override
+	public void onResume() {
+		super.onResume();
+
+		// Register a receiver for chat push messages
+		IntentFilter intf = new IntentFilter("com.google.android.c2dm.intent.RECEIVE");
+		intf.addCategory("com.tan_ce.tecingamechat");
+		registerReceiver(chatReceiver, intf);
+
+		// Clear all notifications
+		NotificationManager notificationManager = (NotificationManager)getSystemService(Context.NOTIFICATION_SERVICE);
+		notificationManager.cancel(ChatIntentService.NOTIFICATION_ID);
+	}
+
+	@Override
 	public boolean onOptionsItemSelected(MenuItem item) {
 		// Handle action bar item clicks here. The action bar will
 		// automatically handle clicks on the Home/Up button, so long
@@ -487,6 +516,40 @@ public class ChatActivity extends Activity {
 	}
 
 	/**
+	 * Receives new chat notifications
+	 */
+	public BroadcastReceiver chatReceiver = new BroadcastReceiver() {
+		@Override
+		public void onReceive(Context context, Intent intent) {
+			if (history.nextIdx == 0) {
+				return;
+			}
+
+			(new HistoryUpdator<Integer>(history.nextIdx - 1) {
+				@Override
+				protected Boolean doInBackground(Integer... params) {
+					try {
+						List<ChatMessage> ret = server.getHistory(history.nextIdx, 50);
+						history.mergeHistory(ret);
+					} catch (Exception e) {
+						e.printStackTrace();
+						return true;
+					}
+
+					return false;
+				}
+
+				@Override
+				protected void onPostExecute2() {
+					// Clear notifications
+					NotificationManager notificationManager = (NotificationManager)getSystemService(Context.NOTIFICATION_SERVICE);
+					notificationManager.cancel(ChatIntentService.NOTIFICATION_ID);
+				}
+			}).execute();
+		}
+	};
+
+	/**
 	 * Abstract class used to update the history and subsequently the UI
 	 */
 	protected abstract class HistoryUpdator<T> extends AsyncTask<T, Void, Boolean> {
@@ -504,6 +567,12 @@ public class ChatActivity extends Activity {
 				updateChatView();
 				new Handler().post(new ChatScroller(scrollIdx));
 			}
+
+			onPostExecute2();
+		}
+
+		protected void onPostExecute2() {
+
 		}
 	}
 

@@ -7,8 +7,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.support.v4.app.NotificationCompat;
-import android.util.Log;
-
 import com.google.android.gms.gcm.GoogleCloudMessaging;
 
 public class ChatIntentService extends IntentService {
@@ -24,13 +22,10 @@ public class ChatIntentService extends IntentService {
 		GoogleCloudMessaging gcm = GoogleCloudMessaging.getInstance(this);
 		String messageType = gcm.getMessageType(intent);
 
-		Log.w("Test", "has intent");
-
 		if (!extras.isEmpty()) {
 			// Filter messages based on message type
 			if (GoogleCloudMessaging.MESSAGE_TYPE_MESSAGE.equals(messageType)) {
-				Log.w("Test", "has notification");
-				sendNotification(extras.getString("msg"));
+				sendNotification(extras.getString("user") + ": " + extras.getString("msg"));
 			}
 		}
 
