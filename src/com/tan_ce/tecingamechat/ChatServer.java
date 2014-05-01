@@ -45,7 +45,7 @@ public class ChatServer {
 	public static final String PREF_GCMID = "gcm_id";
 	protected SharedPreferences pref;
 	protected String authKey;
-	
+
 	protected static void addURLKeyValue(StringBuilder url, String key, String value) {
 		try {
 			url.append("&");
@@ -56,7 +56,7 @@ public class ChatServer {
 			Log.e("ChatServer", "addGetKeyValue: No support for UTF-8???");
 		}
 	}
-	
+
 	/**
 	 * Generates a URL for the API gateway
 	 * 
@@ -64,65 +64,65 @@ public class ChatServer {
 	 * @param query		The query to perform
 	 * @param params	Any additional parameters to put in the $_GET string
 	 * @return			URL object
-	 * @throws 			MalformedURLException  
+	 * @throws 			MalformedURLException
 	 */
 	protected static URL urlBuilder(ChatServer me, String query, Map<String, String> params) throws MalformedURLException {
 		StringBuilder url = new StringBuilder(API_GATEWAY.length() + 64);
 		url.append(API_GATEWAY);
-		
+
 		// Append the query
 		addURLKeyValue(url, "q", query);
-		
+
 		// Append the authKey, if applicable
 		if (me != null) addURLKeyValue(url, "auth_key", me.authKey);
-		
+
 		// Append the rest of the query
 		for (Map.Entry<String, String> e : params.entrySet()) {
 			addURLKeyValue(url, e.getKey(), e.getValue());
 		}
-		
+
 		return new URL(url.toString());
 	}
-	
+
 	/**
 	 * Generates a URL for the API gateway
 	 * 
 	 * @param query		The query to perform
 	 * @param params	Any additional parameters to put in the $_GET string
 	 * @return			URL object
-	 * @throws 			MalformedURLException  
+	 * @throws 			MalformedURLException
 	 */
 	protected URL urlBuilder(String query, Map<String, String> params) throws MalformedURLException {
 		return urlBuilder(this, query, params);
 	}
-	
+
 	/**
 	 * Generates a URL for the API gateway
 	 * 
 	 * @param query		The query to perform
 	 * @return			URL object
-	 * @throws 			MalformedURLException  
+	 * @throws 			MalformedURLException
 	 */
 	protected URL urlBuilder(String query) throws MalformedURLException, UnsupportedEncodingException {
 		return urlBuilder(this, query, new HashMap<String, String>());
 	}
-	
+
 	protected static String postEncoder(Map<String, String> data) {
 		StringBuilder encoded = new StringBuilder(64);
 		for (Map.Entry<String, String> e : data.entrySet()) {
 			try {
-				encoded.append(	URLEncoder.encode(e.getKey(), "utf-8") + "=" + 
-								URLEncoder.encode(e.getValue(), "utf-8") + "&");
+				encoded.append(	URLEncoder.encode(e.getKey(), "utf-8") + "=" +
+						URLEncoder.encode(e.getValue(), "utf-8") + "&");
 			} catch (UnsupportedEncodingException e1) {
 				// Should Never Happen (tm)
 				return "Encoding error?";
 			}
-			
+
 		}
-		
+
 		return encoded.toString();
 	}
-	
+
 	protected static void checkError(JSONObject result) throws Exception {
 		if (result.getInt("error") != 0) {
 			try {
@@ -132,7 +132,7 @@ public class ChatServer {
 			} catch (JSONException e) {
 				// Silently ignore - this means it was not an authentication error
 			}
-			
+
 			String errMsg;
 			try {
 				errMsg = result.getString("error_msg");
@@ -142,11 +142,11 @@ public class ChatServer {
 			throw new Exception(errMsg);
 		}
 	}
-	
+
 	public static void registerUser(Context ctx, String user, String password) throws Exception {
 		// Get the GCM registration ID
 		String gcmId = getGCMId(ctx);
-		
+
 		if (gcmId.isEmpty()) {
 			// Generate a new GCM registration ID
 			try {
@@ -155,64 +155,64 @@ public class ChatServer {
 			} catch (Exception e) {
 				throw new Exception("Error registering with GCM: " + e.getMessage());
 			}
-			
+
 			saveGCMId(ctx, gcmId);
 		}
-		
+
 		// Post the registration info
 		HttpURLConnection conn = (HttpURLConnection)
-			urlBuilder(null, "register", new HashMap<String, String>())
-			.openConnection();
-		
+				urlBuilder(null, "register", new HashMap<String, String>())
+				.openConnection();
+
 		String json_str = null;
-		
+
 		HashMap<String, String> postData = new HashMap<String, String>();
 		postData.put("user", user);
 		postData.put("pwd", password);
 		postData.put("gcm_id", gcmId);
-		
+
 		// Send and receive
 		try {
 			conn.setDoOutput(true);
-			
+
 			OutputStream os = conn.getOutputStream();
 			BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(os, "UTF-8"));
 			writer.write(postEncoder(postData));
 			writer.close();
-			
+
 			InputStream is = conn.getInputStream();
 			BufferedReader reader = new BufferedReader(new InputStreamReader(is, "UTF-8"), 8);
 			json_str = reader.readLine();
 		} finally {
 			conn.disconnect();
 		}
-		
+
 		// Check the returned data for errors
 		JSONObject result = new JSONObject(json_str);
 		checkError(result);
-		
+
 		String authKey = result.getString("auth_key");
 		saveAuthKey(ctx, authKey);
-		Log.i("ChatServer", "Registration successful");		
+		Log.i("ChatServer", "Registration successful");
 	}
-	
+
 	/**
 	 * Constructor
 	 * 
 	 * @param ctx
 	 * @throws NeedRegistrationException
 	 */
-	ChatServer(Context ctx) throws NeedRegistrationException {		
+	ChatServer(Context ctx) throws NeedRegistrationException {
 		// Try to retrieve the authentication key
 		authKey = getAuthKey(ctx);
 		if (authKey.isEmpty()) {
 			throw new NeedRegistrationException();
 		}
-		
+
 		CookieManager cookieManager = new CookieManager();
 		CookieHandler.setDefault(cookieManager);
 	}
-	
+
 	/**
 	 * Handles the result of a history request
 	 * 
@@ -223,7 +223,7 @@ public class ChatServer {
 	protected List<ChatMessage> historyRequest(URL url) throws Exception {
 		HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 		String json_str;
-		
+
 		try {
 			InputStream is = conn.getInputStream();
 			BufferedReader reader = new BufferedReader(new InputStreamReader(is, "UTF-8"), 8);
@@ -231,122 +231,122 @@ public class ChatServer {
 		} finally {
 			conn.disconnect();
 		}
-		
+
 		JSONObject result = new JSONObject(json_str);
 		checkError(result);
-		
+
 		JSONArray jhist = result.getJSONArray("history");
-		ArrayList<ChatMessage> hist = new ArrayList<ChatMessage>(jhist.length()); 
+		ArrayList<ChatMessage> hist = new ArrayList<ChatMessage>(jhist.length());
 		for (int i = 0; i < jhist.length(); i++) {
 			JSONObject jcm = jhist.getJSONObject(i);
-			
+
 			int idx = jcm.getInt("id");
 			String user = jcm.getString("user");
 			String msg = jcm.getString("msg");
 			// Java uses milliseconds since the epoch:
 			long date = jcm.getLong("ts") * 1000;
-			
+
 			hist.add(new ChatMessage(idx, user, msg, date));
 		}
-		
+
 		return hist;
 	}
-	
+
 	/**
 	 * Retrieves most recent chat message history
 	 * 
 	 * @return
-	 * @throws Exception 
+	 * @throws Exception
 	 */
 	public List<ChatMessage> getHistory() throws Exception {
 		URL url = urlBuilder("history");
 		return historyRequest(url);
 	}
-	
+
 	/**
 	 * Retrieves chat message history
 	 * 
 	 * @return
-	 * @throws Exception 
+	 * @throws Exception
 	 */
 	public List<ChatMessage> getHistory(int startIdx, int count) throws Exception {
 		HashMap<String, String> params = new HashMap<String, String>();
 		params.put("id", Integer.toString(startIdx));
 		params.put("count", Integer.toString(count));
-		
+
 		URL url = urlBuilder("history", params);
 		return historyRequest(url);
 	}
-	
+
 	protected static String getGCMId(Context ctx) {
 		SharedPreferences pref = ctx.getSharedPreferences(ctx.getPackageName(), Context.MODE_PRIVATE);
-		
-	    String registrationId = pref.getString(PREF_GCMID, "");
-	    if (registrationId.isEmpty()) {
-	        Log.i("ChatServer", "Registration not found.");
-	        return "";
-	    }
-	    
-	    // Check if app was updated; if so, it must clear the registration ID
-	    // since the existing regID is not guaranteed to work with the new
-	    // app version.
-	    int registeredVersion = pref.getInt(PREF_VERSION, Integer.MIN_VALUE);
-	    int currentVersion = getAppVersion(ctx);
-	    if (registeredVersion != currentVersion) {
-	        Log.i("ChatServer", "App version changed.");
-	        return "";
-	    }
-	    
-	    return registrationId;
+
+		String registrationId = pref.getString(PREF_GCMID, "");
+		if (registrationId.isEmpty()) {
+			Log.i("ChatServer", "Registration not found.");
+			return "";
+		}
+
+		// Check if app was updated; if so, it must clear the registration ID
+		// since the existing regID is not guaranteed to work with the new
+		// app version.
+		int registeredVersion = pref.getInt(PREF_VERSION, Integer.MIN_VALUE);
+		int currentVersion = getAppVersion(ctx);
+		if (registeredVersion != currentVersion) {
+			Log.i("ChatServer", "App version changed.");
+			return "";
+		}
+
+		return registrationId;
 	}
-	
+
 	protected static int getAppVersion(Context context) {
-	    try {
-	        PackageInfo packageInfo = context.getPackageManager()
-	                .getPackageInfo(context.getPackageName(), 0);
-	        return packageInfo.versionCode;
-	    } catch (NameNotFoundException e) {
-	        // should never happen
-	        throw new RuntimeException("Could not get package name: " + e);
-	    }
+		try {
+			PackageInfo packageInfo = context.getPackageManager()
+					.getPackageInfo(context.getPackageName(), 0);
+			return packageInfo.versionCode;
+		} catch (NameNotFoundException e) {
+			// should never happen
+			throw new RuntimeException("Could not get package name: " + e);
+		}
 	}
-	
+
 	protected static void saveGCMId(Context ctx, String gcmId) {
 		SharedPreferences pref = ctx.getSharedPreferences(ctx.getPackageName(), Context.MODE_PRIVATE);
 		SharedPreferences.Editor editor = pref.edit();
-		
+
 		editor.remove(PREF_AUTHKEY);
 		editor.putString(PREF_GCMID, gcmId);
 		editor.putInt(PREF_VERSION, getAppVersion(ctx));
 		editor.commit();
 	}
-	
+
 	protected static String getAuthKey(Context ctx) {
 		SharedPreferences pref = ctx.getSharedPreferences(ctx.getPackageName(), Context.MODE_PRIVATE);
-		
-	    String authKey = pref.getString(PREF_AUTHKEY, "");
-	    if (authKey.isEmpty()) {
-	        Log.i("ChatServer", "Auth key not found.");
-	        return "";
-	    }
-	    
-	    // Check if app was updated; if so, it must clear the auth key
-	    // since the existing auth key is not guaranteed to work with the new
-	    // app version.
-	    int registeredVersion = pref.getInt(PREF_VERSION, Integer.MIN_VALUE);
-	    int currentVersion = getAppVersion(ctx);
-	    if (registeredVersion != currentVersion) {
-	        Log.i("ChatServer", "App version changed.");
-	        return "";
-	    }
-	    
-	    return authKey;
+
+		String authKey = pref.getString(PREF_AUTHKEY, "");
+		if (authKey.isEmpty()) {
+			Log.i("ChatServer", "Auth key not found.");
+			return "";
+		}
+
+		// Check if app was updated; if so, it must clear the auth key
+		// since the existing auth key is not guaranteed to work with the new
+		// app version.
+		int registeredVersion = pref.getInt(PREF_VERSION, Integer.MIN_VALUE);
+		int currentVersion = getAppVersion(ctx);
+		if (registeredVersion != currentVersion) {
+			Log.i("ChatServer", "App version changed.");
+			return "";
+		}
+
+		return authKey;
 	}
-	
+
 	protected static void saveAuthKey(Context ctx, String authKey) {
 		SharedPreferences pref = ctx.getSharedPreferences(ctx.getPackageName(), Context.MODE_PRIVATE);
 		SharedPreferences.Editor editor = pref.edit();
-		
+
 		editor.putString(PREF_AUTHKEY, authKey);
 		editor.putInt(PREF_VERSION, getAppVersion(ctx));
 		editor.commit();
