@@ -309,7 +309,8 @@ public class ChatActivity extends Activity {
 	protected void addEvent(ChatMessage cm) {
 		// Message
 		TextView tv_msg = new TextView(this);
-		tv_msg.setText(cm.getMessage());
+		String ts = timeFormat.format(cm.getTimestamp());
+		tv_msg.setText(cm.getMessage() + " at " + ts);
 		tv_msg.setTextColor(getResources().getColor(color.secondary_text_light));
 		tv_msg.setTextSize(11);
 
