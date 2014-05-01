@@ -373,11 +373,17 @@ public class ChatActivity extends Activity {
 			
 			// Prime the history with the latest entries
 			(new AsyncTask<Integer, Void, Boolean>() {
+				boolean needRegistration = false;
+				
 				@Override
 				protected Boolean doInBackground(Integer... params) {
 					try {
 						List<ChatMessage> ret = server.getHistory();
 						history.mergeHistory(ret);
+					} catch (NeedRegistrationException e) {
+						needRegistration = true;
+						Log.w("ChatActivity", "Current auth_key not accepted");
+						return true;
 					} catch (Exception e) {
 						e.printStackTrace();
 						return true;
@@ -389,6 +395,10 @@ public class ChatActivity extends Activity {
 				@Override
 				protected void onPostExecute(Boolean failed) {
 					if (failed.booleanValue()) {
+						if (needRegistration) {
+							doLogin();
+							return;
+						}
 						showToast("Failed to retrieve history from server");
 					} else {
 						// Update the view and show the most recent messages

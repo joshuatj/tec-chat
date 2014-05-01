@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import com.google.android.gms.gcm.GoogleCloudMessaging;
@@ -124,6 +125,14 @@ public class ChatServer {
 	
 	protected static void checkError(JSONObject result) throws Exception {
 		if (result.getInt("error") != 0) {
+			try {
+				if (result.getInt("auth_failed") == 1) {
+					throw new NeedRegistrationException();
+				}
+			} catch (JSONException e) {
+				// Silently ignore - this means it was not an authentication error
+			}
+			
 			String errMsg;
 			try {
 				errMsg = result.getString("error_msg");
