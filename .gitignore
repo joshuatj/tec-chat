@@ -1,9 +1,10 @@
-bin
-armeabi
-x86
-obj
-local.properties
-gen
+/bin
+/armeabi
+/x86
+/obj
+/local.properties
+/build.xml
+/gen
 .DS_Store
 .settings
-libs
+/libs
