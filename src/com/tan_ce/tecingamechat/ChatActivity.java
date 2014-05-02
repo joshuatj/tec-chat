@@ -162,13 +162,17 @@ public class ChatActivity extends Activity {
 		(new HistoryUpdator<Integer>(history.nextIdx - 1) {
 			@Override
 			protected Boolean doInBackground(Integer... params) {
-				try {
-					List<ChatMessage> ret = server.getHistory(history.nextIdx, 50);
-					history.mergeHistory(ret);
-				} catch (Exception e) {
-					e.printStackTrace();
-					return true;
-				}
+				int curCount;
+				do {
+					curCount = history.size();
+					try {
+						List<ChatMessage> ret = server.getHistory(history.nextIdx, 500);
+						history.mergeHistory(ret);
+					} catch (Exception e) {
+						e.printStackTrace();
+						return true;
+					}
+				} while (history.size() > curCount);
 
 				return false;
 			}
@@ -489,8 +493,6 @@ public class ChatActivity extends Activity {
 		// Clear all notifications
 		NotificationManager notificationManager = (NotificationManager)getSystemService(Context.NOTIFICATION_SERVICE);
 		notificationManager.cancel(ChatIntentService.NOTIFICATION_ID);
-
-		Log.w("ChatActivity", "onResume");
 
 		// Make sure our history is up to date
 		if (history.nextIdx == 0) {
