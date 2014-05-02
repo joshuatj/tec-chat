@@ -319,7 +319,7 @@ public class ChatServer {
 		// since the existing regID is not guaranteed to work with the new
 		// app version.
 		int registeredVersion = pref.getInt(PREF_VERSION, Integer.MIN_VALUE);
-		int currentVersion = getAppVersion(ctx);
+		int currentVersion = getPrefVersion(ctx);
 		if (registeredVersion != currentVersion) {
 			Log.i("ChatServer", "App version changed.");
 			return "";
@@ -328,15 +328,21 @@ public class ChatServer {
 		return registrationId;
 	}
 
-	protected static int getAppVersion(Context context) {
-		try {
+	/**
+	 * This returns the version of the preferences, not the app's version
+	 * @param context
+	 * @return
+	 */
+	protected static int getPrefVersion(Context context) {
+		return 1;
+		/*try {
 			PackageInfo packageInfo = context.getPackageManager()
 					.getPackageInfo(context.getPackageName(), 0);
 			return packageInfo.versionCode;
 		} catch (NameNotFoundException e) {
 			// should never happen
 			throw new RuntimeException("Could not get package name: " + e);
-		}
+		} */
 	}
 
 	protected static void saveGCMId(Context ctx, String gcmId) {
@@ -345,7 +351,7 @@ public class ChatServer {
 
 		editor.remove(PREF_AUTHKEY);
 		editor.putString(PREF_GCMID, gcmId);
-		editor.putInt(PREF_VERSION, getAppVersion(ctx));
+		editor.putInt(PREF_VERSION, getPrefVersion(ctx));
 		editor.commit();
 	}
 
@@ -362,7 +368,7 @@ public class ChatServer {
 		// since the existing auth key is not guaranteed to work with the new
 		// app version.
 		int registeredVersion = pref.getInt(PREF_VERSION, Integer.MIN_VALUE);
-		int currentVersion = getAppVersion(ctx);
+		int currentVersion = getPrefVersion(ctx);
 		if (registeredVersion != currentVersion) {
 			Log.i("ChatServer", "App version changed.");
 			return "";
@@ -376,7 +382,7 @@ public class ChatServer {
 		SharedPreferences.Editor editor = pref.edit();
 
 		editor.putString(PREF_AUTHKEY, authKey);
-		editor.putInt(PREF_VERSION, getAppVersion(ctx));
+		editor.putInt(PREF_VERSION, getPrefVersion(ctx));
 		editor.commit();
 	}
 }

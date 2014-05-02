@@ -36,8 +36,9 @@ public class ChatIntentService extends IntentService {
 		NotificationManager nm = (NotificationManager)
 				this.getSystemService(Context.NOTIFICATION_SERVICE);
 
+		Intent notificationIntent = new Intent(this, ChatActivity.class);
 		PendingIntent contentIntent = PendingIntent.getActivity(this, 0,
-				new Intent(this, ChatActivity.class), 0);
+				notificationIntent, 0);
 
 		NotificationCompat.Builder builder =
 				new NotificationCompat.Builder(this)

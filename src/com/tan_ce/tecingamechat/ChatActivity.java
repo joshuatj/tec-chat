@@ -107,6 +107,48 @@ public class ChatActivity extends Activity {
 	}
 
 	/**
+	 * Prime the history store with the latest 50 messages
+	 */
+	protected void primeHistory() {
+		// Prime the history with the latest entries
+		(new AsyncTask<Integer, Void, Boolean>() {
+			boolean needRegistration = false;
+
+			@Override
+			protected Boolean doInBackground(Integer... params) {
+				try {
+					List<ChatMessage> ret = server.getHistory();
+					history.mergeHistory(ret);
+				} catch (NeedRegistrationException e) {
+					needRegistration = true;
+					Log.w("ChatActivity", "Current auth_key not accepted");
+					return true;
+				} catch (Exception e) {
+					e.printStackTrace();
+					return true;
+				}
+
+				return false;
+			}
+
+			@Override
+			protected void onPostExecute(Boolean failed) {
+				if (failed.booleanValue()) {
+					if (needRegistration) {
+						doLogin();
+						return;
+					}
+					showToast("Failed to retrieve history from server");
+				} else {
+					// Update the view and show the most recent messages
+					updateChatView();
+					new Handler().post(new ChatScroller(history.nextIdx - 1));
+				}
+			}
+		}).execute();
+	}
+
+	/**
 	 * Run when the user forces a manual refresh
 	 * 
 	 * @param menu
@@ -381,43 +423,6 @@ public class ChatActivity extends Activity {
 		if (savedInstanceState == null) {
 			history = new ChatHistory();
 
-			// Prime the history with the latest entries
-			(new AsyncTask<Integer, Void, Boolean>() {
-				boolean needRegistration = false;
-
-				@Override
-				protected Boolean doInBackground(Integer... params) {
-					try {
-						List<ChatMessage> ret = server.getHistory();
-						history.mergeHistory(ret);
-					} catch (NeedRegistrationException e) {
-						needRegistration = true;
-						Log.w("ChatActivity", "Current auth_key not accepted");
-						return true;
-					} catch (Exception e) {
-						e.printStackTrace();
-						return true;
-					}
-
-					return false;
-				}
-
-				@Override
-				protected void onPostExecute(Boolean failed) {
-					if (failed.booleanValue()) {
-						if (needRegistration) {
-							doLogin();
-							return;
-						}
-						showToast("Failed to retrieve history from server");
-					} else {
-						// Update the view and show the most recent messages
-						updateChatView();
-						new Handler().post(new ChatScroller(history.nextIdx - 1));
-					}
-				}
-			}).execute();
-
 			getFragmentManager().beginTransaction()
 			.add(R.id.container, new PlaceholderFragment()).commit();
 		} else {
@@ -484,6 +489,15 @@ public class ChatActivity extends Activity {
 		// Clear all notifications
 		NotificationManager notificationManager = (NotificationManager)getSystemService(Context.NOTIFICATION_SERVICE);
 		notificationManager.cancel(ChatIntentService.NOTIFICATION_ID);
+
+		Log.w("ChatActivity", "onResume");
+
+		// Make sure our history is up to date
+		if (history.nextIdx == 0) {
+			primeHistory();
+		} else {
+			refreshHistory(null);
+		}
 	}
 
 	@Override
