@@ -142,20 +142,16 @@ public class ChatServer {
 	}
 
 	public static void registerUser(Context ctx, String user, String password) throws Exception {
-		// Get the GCM registration ID
-		String gcmId = getGCMId(ctx);
-
-		if (gcmId.isEmpty()) {
-			// Generate a new GCM registration ID
-			try {
-				GoogleCloudMessaging gcm = GoogleCloudMessaging.getInstance(ctx);
-				gcmId = gcm.register(SENDER_ID);
-			} catch (Exception e) {
-				throw new Exception("Error registering with GCM: " + e.getMessage());
-			}
-
-			saveGCMId(ctx, gcmId);
+		String gcmId;
+		// Generate a new GCM registration ID
+		try {
+			GoogleCloudMessaging gcm = GoogleCloudMessaging.getInstance(ctx);
+			gcmId = gcm.register(SENDER_ID);
+		} catch (Exception e) {
+			throw new Exception("Error registering with GCM: " + e.getMessage());
 		}
+
+		saveGCMId(ctx, gcmId);
 
 		// Post the registration info
 		HttpURLConnection conn = (HttpURLConnection)
