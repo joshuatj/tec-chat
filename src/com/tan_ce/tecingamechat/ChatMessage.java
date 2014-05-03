@@ -2,6 +2,9 @@ package com.tan_ce.tecingamechat;
 
 import java.util.Comparator;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 /**
  * Represents a single chat message
  * 
@@ -27,6 +30,14 @@ public class ChatMessage {
 		this.user = user;
 		this.msg = message;
 		this.unixTime = date;
+	}
+
+	ChatMessage(JSONObject jcm) throws JSONException {
+		this.idx = jcm.getInt("id");
+		this.user = jcm.getString("user");
+		this.msg = jcm.getString("msg");
+		// Java uses milliseconds since the epoch:
+		this.unixTime = jcm.getLong("ts") * 1000;
 	}
 
 	int getIdx() { return idx; }

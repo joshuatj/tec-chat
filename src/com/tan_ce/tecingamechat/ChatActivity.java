@@ -31,6 +31,7 @@ import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
+import com.google.android.gms.gcm.GoogleCloudMessaging;
 
 public class ChatActivity extends Activity {
 	protected static SimpleDateFormat timeFormat = new SimpleDateFormat("hh:mm aaa", Locale.getDefault());
@@ -159,24 +160,7 @@ public class ChatActivity extends Activity {
 			return;
 		}
 
-		(new HistoryUpdator<Integer>(history.nextIdx - 1) {
-			@Override
-			protected Boolean doInBackground(Integer... params) {
-				int curCount;
-				do {
-					curCount = history.size();
-					try {
-						List<ChatMessage> ret = server.getHistory(history.nextIdx, 500);
-						history.mergeHistory(ret);
-					} catch (Exception e) {
-						e.printStackTrace();
-						return true;
-					}
-				} while (history.size() > curCount);
-
-				return false;
-			}
-		}).execute();
+		(new HistoryRefresher(history.nextIdx - 1)).execute();
 	}
 
 	protected ChatMessage viewToChatMessage(View v) {
@@ -537,31 +521,72 @@ public class ChatActivity extends Activity {
 	public BroadcastReceiver chatReceiver = new BroadcastReceiver() {
 		@Override
 		public void onReceive(Context context, Intent intent) {
+			// If we're still waiting for first sync, then ignore this notification
 			if (history.nextIdx == 0) {
 				return;
 			}
 
-			(new HistoryUpdator<Integer>(history.nextIdx - 1) {
-				@Override
-				protected Boolean doInBackground(Integer... params) {
+			// Get the pushed message
+			Bundle extras = intent.getExtras();
+			GoogleCloudMessaging gcm = GoogleCloudMessaging.getInstance(context);
+			String messageType = gcm.getMessageType(intent);
+			if (	!extras.isEmpty() &&
+					GoogleCloudMessaging.MESSAGE_TYPE_MESSAGE.equals(messageType)) {
+
+				int idx = -1;
+				String idx_str = extras.getString("idx");
+
+				if (idx_str != null) {
 					try {
-						List<ChatMessage> ret = server.getHistory(history.nextIdx, 50);
-						history.mergeHistory(ret);
-					} catch (Exception e) {
-						e.printStackTrace();
-						return true;
+						idx = Integer.parseInt(idx_str);
+					} catch (NumberFormatException e) {
+						// Ignore, let idx = -1
 					}
-
-					return false;
 				}
 
-				@Override
-				protected void onPostExecute2() {
-					// Clear notifications
-					NotificationManager notificationManager = (NotificationManager)getSystemService(Context.NOTIFICATION_SERVICE);
-					notificationManager.cancel(ChatIntentService.NOTIFICATION_ID);
+				if (idx != -1 && history.nextIdx == idx) {
+					// We received exactly the next message we're expecting.
+					String user = extras.getString("user");
+					String msg = extras.getString("msg");
+					// Java uses milliseconds since the epoch:
+					long ts = Long.parseLong(extras.getString("ts", "0")) * 1000;
+
+					if (user == null || msg == null || ts == 0) {
+						Log.w("ChatActivity", "Notification with bad data received");
+					} else {
+						Log.i("ChatActivity", "Updating by injection");
+						history.add(new ChatMessage(idx, user, msg, ts));
+						new Handler().post(new Runnable() {
+							@Override
+							public void run() {
+								// Clear notifications
+								NotificationManager notificationManager = (NotificationManager)getSystemService(Context.NOTIFICATION_SERVICE);
+								notificationManager.cancel(ChatIntentService.NOTIFICATION_ID);
+
+								// Update chat view
+								updateChatView();
+
+								// Scroll one message down
+								// Hmm... there has to be a better way to do this.
+								// TODO: Detect if we're already at the bottom, and only scroll
+								// in that case.
+								// new Handler().post(new ChatScroller(getVisibleChat().getIdx() + 1));
+							}
+						});
+					}
+				} else {
+					Log.i("ChatActivity", "Updating by refresh");
+					// We might have gotten out of sync. Better do a full refresh
+					(new HistoryRefresher(history.nextIdx - 1) {
+						@Override
+						protected void onPostExecute2() {
+							// Clear notifications
+							NotificationManager notificationManager = (NotificationManager)getSystemService(Context.NOTIFICATION_SERVICE);
+							notificationManager.cancel(ChatIntentService.NOTIFICATION_ID);
+						}
+					}).execute();
 				}
-			}).execute();
+			}
 		}
 	};
 
@@ -571,6 +596,11 @@ public class ChatActivity extends Activity {
 	protected abstract class HistoryUpdator<T> extends AsyncTask<T, Void, Boolean> {
 		int scrollIdx;
 
+		/**
+		 * Constructor
+		 * 
+		 * @param scrollIdx If greater than zero, will scroll to that message upon completion
+		 */
 		HistoryUpdator(int scrollIdx) {
 			this.scrollIdx = scrollIdx;
 		}
@@ -581,14 +611,42 @@ public class ChatActivity extends Activity {
 				showToast("Failed to retrieve history from server");
 			} else {
 				updateChatView();
-				new Handler().post(new ChatScroller(scrollIdx));
+				if (scrollIdx >= 0) {
+					new Handler().post(new ChatScroller(scrollIdx));
+				}
 			}
 
 			onPostExecute2();
 		}
 
 		protected void onPostExecute2() {
+			// Stub that may be overwritten by subclasses
+		}
+	}
 
+	/**
+	 * Class used to update the history with the latest chat messages
+	 */
+	protected class HistoryRefresher extends HistoryUpdator<Void> {
+		HistoryRefresher(int scrollIdx) {
+			super(scrollIdx);
+		}
+
+		@Override
+		protected Boolean doInBackground(Void... params) {
+			int curCount;
+			do {
+				curCount = history.size();
+				try {
+					List<ChatMessage> ret = server.getHistory(history.nextIdx, 500);
+					history.mergeHistory(ret);
+				} catch (Exception e) {
+					e.printStackTrace();
+					return true;
+				}
+			} while (history.size() > curCount);
+
+			return false;
 		}
 	}
 

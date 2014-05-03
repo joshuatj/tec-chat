@@ -23,7 +23,10 @@ public class ChatHistory implements Parcelable {
 	public ChatMessage get(int idx) { return history.get(idx); }
 	public Iterable<ChatMessage> getIterable() { return history; }
 	public int size() { return history.size(); }
-	public void add(ChatMessage msg) { history.add(msg); }
+	public void add(ChatMessage msg) {
+		history.add(msg);
+		nextIdx = history.get(history.size() - 1).getIdx() + 1;
+	}
 
 	/**
 	 * Merges two lists.

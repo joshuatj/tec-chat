@@ -26,8 +26,6 @@ import com.google.android.gms.gcm.GoogleCloudMessaging;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.content.pm.PackageInfo;
-import android.content.pm.PackageManager.NameNotFoundException;
 import android.util.Log;
 
 /**
@@ -239,14 +237,7 @@ public class ChatServer {
 		ArrayList<ChatMessage> hist = new ArrayList<ChatMessage>(jhist.length());
 		for (int i = 0; i < jhist.length(); i++) {
 			JSONObject jcm = jhist.getJSONObject(i);
-
-			int idx = jcm.getInt("id");
-			String user = jcm.getString("user");
-			String msg = jcm.getString("msg");
-			// Java uses milliseconds since the epoch:
-			long date = jcm.getLong("ts") * 1000;
-
-			hist.add(new ChatMessage(idx, user, msg, date));
+			hist.add(new ChatMessage(jcm));
 		}
 
 		return hist;
