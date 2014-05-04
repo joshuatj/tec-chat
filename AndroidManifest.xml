@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.tan_ce.tecingamechat"
-    android:versionCode="4"
-    android:versionName="1.0r4" >
+    android:versionCode="5"
+    android:versionName="1.0r5" >
 
     <uses-sdk
         android:minSdkVersion="14"
@@ -54,6 +54,11 @@
             android:name="com.tan_ce.tecingamechat.LoginActivity"
             android:label="@string/title_activity_login"
             android:windowSoftInputMode="adjustResize|stateVisible" >
+        </activity>
+        <activity
+            android:name="com.tan_ce.tecingamechat.SettingsActivity"
+            android:parentActivityName="ChatActivity"
+            android:label="@string/title_activity_settings" >
         </activity>
     </application>
 
