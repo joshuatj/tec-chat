@@ -5,8 +5,11 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.support.v4.app.NotificationCompat;
+
 import com.google.android.gms.gcm.GoogleCloudMessaging;
 
 public class ChatIntentService extends IntentService {
@@ -18,11 +21,13 @@ public class ChatIntentService extends IntentService {
 
 	@Override
 	protected void onHandleIntent(Intent intent) {
+		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
 		Bundle extras = intent.getExtras();
 		GoogleCloudMessaging gcm = GoogleCloudMessaging.getInstance(this);
 		String messageType = gcm.getMessageType(intent);
 
-		if (!extras.isEmpty()) {
+		// Ignore if the user doesn't want notifications
+		if (prefs.getBoolean("notifications_new_message", true) && !extras.isEmpty()) {
 			// Filter messages based on message type
 			if (GoogleCloudMessaging.MESSAGE_TYPE_MESSAGE.equals(messageType)) {
 				sendNotification(extras.getString("user") + ": " + extras.getString("msg"));
