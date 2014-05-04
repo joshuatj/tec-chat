@@ -40,6 +40,24 @@ public class ChatActivity extends Activity {
 	protected ChatHistory history;
 	protected ChatServer server;
 
+	protected int scrollTo = -1;
+	/*
+	 * When we need to scroll to a particular index, but don't know where,
+	 * use this. If we are being restored it returns the index where we should
+	 * scroll to. Otherwise, it returns the last index.
+	 * 
+	 * Hackish yes, but I couldn't think of any other way on short notice...
+	 */
+	protected int getRestoredIdx() {
+		if (scrollTo != -1) {
+			int ret = scrollTo;
+			scrollTo = -1;
+			return ret;
+		} else {
+			return history.nextIdx - 1;
+		}
+	}
+
 	protected void showToast(String msg) {
 		Toast toast = Toast.makeText(getApplicationContext(), msg, Toast.LENGTH_SHORT);
 		toast.show();
@@ -160,7 +178,7 @@ public class ChatActivity extends Activity {
 			return;
 		}
 
-		(new HistoryRefresher(history.nextIdx - 1)).execute();
+		(new HistoryRefresher(getRestoredIdx())).execute();
 	}
 
 	protected ChatMessage viewToChatMessage(View v) {
@@ -424,7 +442,9 @@ public class ChatActivity extends Activity {
 
 		ChatMessage cm = getVisibleChat();
 		int curIdx = -1;
-		if (cm != null) {
+		if (cm == null) {
+			Log.w("ChatActivity.onSaveInstanceState", "No topmost?");
+		} else {
 			curIdx = cm.getIdx();
 		}
 		savedInstanceState.putInt("curIdx", curIdx);
@@ -448,8 +468,8 @@ public class ChatActivity extends Activity {
 			updateChatView();
 		}
 
-		int curIdx = savedInstanceState.getInt("curIdx");
-		new Handler().post(new ChatScroller(curIdx));
+		// Indicate where we should be
+		scrollTo = savedInstanceState.getInt("curIdx");
 	}
 
 	@Override
@@ -559,18 +579,28 @@ public class ChatActivity extends Activity {
 						new Handler().post(new Runnable() {
 							@Override
 							public void run() {
-								// Clear notifications
-								NotificationManager notificationManager = (NotificationManager)getSystemService(Context.NOTIFICATION_SERVICE);
-								notificationManager.cancel(ChatIntentService.NOTIFICATION_ID);
-
 								// Update chat view
 								updateChatView();
 
-								// Scroll one message down
-								// Hmm... there has to be a better way to do this.
-								// TODO: Detect if we're already at the bottom, and only scroll
-								// in that case.
-								// new Handler().post(new ChatScroller(getVisibleChat().getIdx() + 1));
+								// Chat positions won't be updated until the UI loop
+								// has had time to update the children
+								new Handler().post(new Runnable() {
+									@Override
+									public void run() {
+										// Scroll down by one chat
+										ChatMessage topmost = getVisibleChat();
+										if (topmost == null) {
+											Log.w("ChatActivity.chatReceiver", "No topmost?");
+										} else {
+											int idx = topmost.getIdx() + 1;
+											new ChatScroller(idx).run();
+										}
+
+										// Clear notifications
+										NotificationManager notificationManager = (NotificationManager)getSystemService(Context.NOTIFICATION_SERVICE);
+										notificationManager.cancel(ChatIntentService.NOTIFICATION_ID);
+									}
+								});
 							}
 						});
 					}
