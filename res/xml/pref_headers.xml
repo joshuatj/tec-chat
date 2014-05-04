@@ -3,9 +3,6 @@
     <!-- These settings headers are only used on tablets. -->
 
     <header
-        android:fragment="com.tan_ce.tecingamechat.SettingsActivity$GeneralPreferenceFragment"
-        android:title="@string/pref_header_general" />
-    <header
         android:fragment="com.tan_ce.tecingamechat.SettingsActivity$NotificationPreferenceFragment"
         android:title="@string/pref_header_notifications" />
     <header
