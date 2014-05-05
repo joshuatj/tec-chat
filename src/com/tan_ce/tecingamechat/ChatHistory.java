@@ -37,9 +37,14 @@ public class ChatHistory implements Parcelable {
 
 		// Update lastIdx in the main preferences
 		if (prefs != null) {
-			SharedPreferences.Editor editor = prefs.edit();
-			editor.putInt("lastIdx", curIdx);
-			editor.commit();
+			// TODO: Remove testing code
+			if (history.get(history.size() - 1).getUser().equals("tester")) {
+				Log.i("ChatHistory", "Not saving lastIdx for tester message");
+			} else {
+				SharedPreferences.Editor editor = prefs.edit();
+				editor.putInt("lastIdx", curIdx);
+				editor.commit();
+			}
 		}
 
 		// Update nextIdx

@@ -541,6 +541,36 @@ public class ChatActivity extends Activity {
 	}
 
 	/**
+	 * Indicates whether the user is near the bottom of the scrollable region
+	 * 
+	 * @return
+	 */
+	protected boolean scrollIsAtBottom() {
+		ScrollView sl = (ScrollView) findViewById(R.id.chat_scroller);
+		LinearLayout ll = (LinearLayout) findViewById(R.id.chat_layout);
+
+		int scrollBottom = sl.getScrollY() + sl.getHeight() + /* a bit of margin */ 5;
+		return (scrollBottom >= ll.getMeasuredHeight());
+	}
+
+	protected class PostMsgHandler implements Runnable {
+		protected boolean scroll;
+
+		PostMsgHandler(boolean scroll) { this.scroll = scroll; }
+
+		@Override
+		public void run() {
+			if (scroll) {
+				new ChatScroller(history.getNextIdx() - 1).run();
+			}
+
+			// Clear notifications
+			NotificationManager notificationManager = (NotificationManager)getSystemService(Context.NOTIFICATION_SERVICE);
+			notificationManager.cancel(ChatIntentService.NOTIFICATION_ID);
+		}
+	}
+
+	/**
 	 * Receives new chat notifications
 	 */
 	public BroadcastReceiver chatReceiver = new BroadcastReceiver() {
@@ -573,39 +603,33 @@ public class ChatActivity extends Activity {
 					new Handler().post(new Runnable() {
 						@Override
 						public void run() {
+							boolean scroll = scrollIsAtBottom();
+
 							// Update chat view
 							updateChatView();
 
-							// Chat positions won't be updated until the UI loop
-							// has had time to update the children
-							new Handler().post(new Runnable() {
-								@Override
-								public void run() {
-									// Scroll down by one chat
-									ChatMessage topmost = getVisibleChat();
-									if (topmost == null) {
-										Log.w("ChatActivity.chatReceiver", "No topmost?");
-									} else {
-										int idx = topmost.getIdx() + 1;
-										new ChatScroller(idx).run();
-									}
-
-									// Clear notifications
-									NotificationManager notificationManager = (NotificationManager)getSystemService(Context.NOTIFICATION_SERVICE);
-									notificationManager.cancel(ChatIntentService.NOTIFICATION_ID);
-								}
-							});
+							// Chat positions won't be updated until the UI loop has time to update
+							// the children, so run the scroller in a handler
+							new Handler().post(new PostMsgHandler(scroll));
 						}
 					});
 				} else {
-					Log.i("ChatActivity", "Updating by refresh");
 					// We might have gotten out of sync. Better do a full refresh
-					(new HistoryRefresher(history.nextIdx - 1) {
+					Log.i("ChatActivity", "Updating by refresh");
+
+					// Determine whether we should scroll after the update
+					int tmp;
+					if (scrollIsAtBottom()) tmp = 1;
+					else tmp = 0;
+
+					(new HistoryRefresher(tmp) {
 						@Override
-						protected void onPostExecute2() {
-							// Clear notifications
-							NotificationManager notificationManager = (NotificationManager)getSystemService(Context.NOTIFICATION_SERVICE);
-							notificationManager.cancel(ChatIntentService.NOTIFICATION_ID);
+						protected void onPostExecute(Boolean failed) {
+							if (failed.booleanValue()) {
+								showToast("Failed to retrieve history from server");
+							} else {
+								new PostMsgHandler(scrollIdx == 1).run();
+							}
 						}
 					}).execute();
 				}
