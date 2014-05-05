@@ -555,57 +555,45 @@ public class ChatActivity extends Activity {
 			if (	!extras.isEmpty() &&
 					GoogleCloudMessaging.MESSAGE_TYPE_MESSAGE.equals(messageType)) {
 
-				int idx = -1;
-				String idx_str = extras.getString("idx");
-
-				if (idx_str != null) {
-					try {
-						idx = Integer.parseInt(idx_str);
-					} catch (NumberFormatException e) {
-						// Ignore, let idx = -1
-					}
+				ChatMessage cm;
+				try {
+					cm = new ChatMessage(extras);
+				} catch (Exception e) {
+					Log.w("ChatActivity", "Server pushed invalid message: " + e.getMessage());
+					return;
 				}
 
-				if (idx != -1 && history.nextIdx == idx) {
+				if (history.nextIdx == cm.getIdx()) {
 					// We received exactly the next message we're expecting.
-					String user = extras.getString("user");
-					String msg = extras.getString("msg");
-					// Java uses milliseconds since the epoch:
-					long ts = Long.parseLong(extras.getString("ts", "0")) * 1000;
+					Log.i("ChatActivity", "Updating by injection");
+					history.add(cm);
+					new Handler().post(new Runnable() {
+						@Override
+						public void run() {
+							// Update chat view
+							updateChatView();
 
-					if (user == null || msg == null || ts == 0) {
-						Log.w("ChatActivity", "Notification with bad data received");
-					} else {
-						Log.i("ChatActivity", "Updating by injection");
-						history.add(new ChatMessage(idx, user, msg, ts));
-						new Handler().post(new Runnable() {
-							@Override
-							public void run() {
-								// Update chat view
-								updateChatView();
-
-								// Chat positions won't be updated until the UI loop
-								// has had time to update the children
-								new Handler().post(new Runnable() {
-									@Override
-									public void run() {
-										// Scroll down by one chat
-										ChatMessage topmost = getVisibleChat();
-										if (topmost == null) {
-											Log.w("ChatActivity.chatReceiver", "No topmost?");
-										} else {
-											int idx = topmost.getIdx() + 1;
-											new ChatScroller(idx).run();
-										}
-
-										// Clear notifications
-										NotificationManager notificationManager = (NotificationManager)getSystemService(Context.NOTIFICATION_SERVICE);
-										notificationManager.cancel(ChatIntentService.NOTIFICATION_ID);
+							// Chat positions won't be updated until the UI loop
+							// has had time to update the children
+							new Handler().post(new Runnable() {
+								@Override
+								public void run() {
+									// Scroll down by one chat
+									ChatMessage topmost = getVisibleChat();
+									if (topmost == null) {
+										Log.w("ChatActivity.chatReceiver", "No topmost?");
+									} else {
+										int idx = topmost.getIdx() + 1;
+										new ChatScroller(idx).run();
 									}
-								});
-							}
-						});
-					}
+
+									// Clear notifications
+									NotificationManager notificationManager = (NotificationManager)getSystemService(Context.NOTIFICATION_SERVICE);
+									notificationManager.cancel(ChatIntentService.NOTIFICATION_ID);
+								}
+							});
+						}
+					});
 				} else {
 					Log.i("ChatActivity", "Updating by refresh");
 					// We might have gotten out of sync. Better do a full refresh

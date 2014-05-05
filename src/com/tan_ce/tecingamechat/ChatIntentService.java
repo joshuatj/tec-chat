@@ -9,6 +9,7 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.support.v4.app.NotificationCompat;
+import android.util.Log;
 
 import com.google.android.gms.gcm.GoogleCloudMessaging;
 
@@ -30,7 +31,20 @@ public class ChatIntentService extends IntentService {
 		if (prefs.getBoolean("notifications_new_message", true) && !extras.isEmpty()) {
 			// Filter messages based on message type
 			if (GoogleCloudMessaging.MESSAGE_TYPE_MESSAGE.equals(messageType)) {
-				sendNotification(extras.getString("user") + ": " + extras.getString("msg"));
+				int lastIdx = prefs.getInt("lastIdx", 0);
+				ChatMessage cm;
+
+				try {
+					cm = new ChatMessage(extras);
+
+					// Only show a notification if the UI hasn't processed this
+					// message in the foreground
+					if (lastIdx < cm.getIdx()) {
+						sendNotification(cm.getUser() + ": " + cm.getMessage());
+					}
+				} catch (Exception e) {
+					Log.w("ChatActivity", "Server pushed invalid message: " + e.getMessage());
+				}
 			}
 		}
 
