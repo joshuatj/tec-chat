@@ -5,8 +5,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.ListIterator;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.preference.PreferenceManager;
+import android.util.Log;
 
 /**
  * Represents the chat history cache of the app. Is a parcelable in order
@@ -17,15 +21,55 @@ import android.os.Parcelable;
  */
 public class ChatHistory implements Parcelable {
 	public int earliestIdx = Integer.MAX_VALUE;
-	public int nextIdx = 0;
+
+	protected int nextIdx = 0;
 	protected List<ChatMessage> history;
+	protected SharedPreferences prefs = null;
 
 	public ChatMessage get(int idx) { return history.get(idx); }
 	public Iterable<ChatMessage> getIterable() { return history; }
 	public int size() { return history.size(); }
+	public int getNextIdx() { return nextIdx; }
+
+	protected void updateNextIdx() {
+		if (history.size() < 1) return;
+		int curIdx = history.get(history.size() - 1).getIdx();
+
+		// Update lastIdx in the main preferences
+		if (prefs != null) {
+			SharedPreferences.Editor editor = prefs.edit();
+			editor.putInt("lastIdx", curIdx);
+			editor.commit();
+		}
+
+		// Update nextIdx
+		nextIdx = curIdx + 1;
+	}
+
+	/**
+	 * Sets a context so that this class can update lastIdx in shared preferences,
+	 * ensuring that notifications aren't shown for chats that are processed by
+	 * a foreground Activity
+	 * 
+	 * @param ctx
+	 */
+	public void setContext(Context ctx) {
+		prefs = PreferenceManager.getDefaultSharedPreferences(ctx);
+		updateNextIdx();
+	}
+
+	/**
+	 * Add a new message to the end of the chat history
+	 * 
+	 * @param msg
+	 */
 	public void add(ChatMessage msg) {
 		history.add(msg);
-		nextIdx = history.get(history.size() - 1).getIdx() + 1;
+		if (msg.getIdx() != nextIdx) {
+			Log.w("ChatHistory", "add(): Message is not the next message!");
+		}
+
+		updateNextIdx();
 	}
 
 	/**
@@ -42,7 +86,6 @@ public class ChatHistory implements Parcelable {
 		// Sort
 		Collections.sort(c, new ChatMessage.ChatMessageComparator());
 		earliestIdx = c.get(0).getIdx();
-		nextIdx = c.get(c.size() - 1).getIdx() + 1;
 
 		// Some processing on the whole history
 		ChatMessage prev = null;
@@ -58,10 +101,12 @@ public class ChatHistory implements Parcelable {
 		}
 
 		history = c;
+		updateNextIdx();
 	}
 
-	public ChatHistory() {
+	public ChatHistory(Context ctx) {
 		history = new ArrayList<ChatMessage>();
+		setContext(ctx);
 	}
 
 	@Override
@@ -100,7 +145,7 @@ public class ChatHistory implements Parcelable {
 
 		// Set the min and max
 		earliestIdx = history.get(0).getIdx();
-		nextIdx = history.get(history.size() - 1).getIdx() + 1;
+		updateNextIdx();
 	}
 
 	public static final Parcelable.Creator<ChatHistory> CREATOR

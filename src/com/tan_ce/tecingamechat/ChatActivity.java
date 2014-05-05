@@ -54,7 +54,7 @@ public class ChatActivity extends Activity {
 			scrollTo = -1;
 			return ret;
 		} else {
-			return history.nextIdx - 1;
+			return history.getNextIdx() - 1;
 		}
 	}
 
@@ -161,7 +161,7 @@ public class ChatActivity extends Activity {
 				} else {
 					// Update the view and show the most recent messages
 					updateChatView();
-					new Handler().post(new ChatScroller(history.nextIdx - 1));
+					new Handler().post(new ChatScroller(history.getNextIdx() - 1));
 				}
 			}
 		}).execute();
@@ -173,7 +173,7 @@ public class ChatActivity extends Activity {
 	 * @param menu
 	 */
 	public void refreshHistory(MenuItem menu) {
-		if (history.nextIdx == 0) {
+		if (history.getNextIdx() == 0) {
 			showToast("Loading...");
 			return;
 		}
@@ -427,12 +427,13 @@ public class ChatActivity extends Activity {
 		}
 
 		if (savedInstanceState == null) {
-			history = new ChatHistory();
+			history = new ChatHistory(this);
 
 			getFragmentManager().beginTransaction()
 			.add(R.id.container, new PlaceholderFragment()).commit();
 		} else {
 			history = savedInstanceState.getParcelable("history");
+			history.setContext(this);
 		} // */
 	}
 
@@ -456,6 +457,8 @@ public class ChatActivity extends Activity {
 	public void onRestoreInstanceState(Bundle savedInstanceState) {
 		super.onRestoreInstanceState(savedInstanceState);
 		history = savedInstanceState.getParcelable("history");
+		history.setContext(this);
+
 		try {
 			server = new ChatServer(this);
 		} catch (NeedRegistrationException e) {
@@ -499,7 +502,7 @@ public class ChatActivity extends Activity {
 		notificationManager.cancel(ChatIntentService.NOTIFICATION_ID);
 
 		// Make sure our history is up to date
-		if (history.nextIdx == 0) {
+		if (history.getNextIdx() == 0) {
 			primeHistory();
 		} else {
 			refreshHistory(null);
@@ -544,7 +547,7 @@ public class ChatActivity extends Activity {
 		@Override
 		public void onReceive(Context context, Intent intent) {
 			// If we're still waiting for first sync, then ignore this notification
-			if (history.nextIdx == 0) {
+			if (history.getNextIdx() == 0) {
 				return;
 			}
 
