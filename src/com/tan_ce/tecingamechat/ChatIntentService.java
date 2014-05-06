@@ -1,12 +1,18 @@
 package com.tan_ce.tecingamechat;
 
+import java.io.IOException;
+
 import android.app.IntentService;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.media.AudioManager;
+import android.media.MediaPlayer;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Vibrator;
 import android.preference.PreferenceManager;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
@@ -41,6 +47,19 @@ public class ChatIntentService extends IntentService {
 					// message in the foreground
 					if (lastIdx < cm.getIdx()) {
 						sendNotification(cm.getUser() + ": " + cm.getMessage());
+
+						// Play the ringtone
+						String ringtone = prefs.getString("notifications_new_message_ringtone", "default ringtone");
+						if (!ringtone.isEmpty()) {
+							Uri ringtoneUri = Uri.parse(ringtone);
+							playSound(ringtoneUri);
+						}
+					}
+
+					if (prefs.getBoolean("notifications_new_message_vibrate", false)) {
+						// Always vibrate on a new message
+						Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+						v.vibrate(300);
 					}
 				} catch (Exception e) {
 					Log.w("ChatActivity", "Server pushed invalid message: " + e.getMessage());
@@ -49,6 +68,23 @@ public class ChatIntentService extends IntentService {
 		}
 
 		GcmBroadcastReceiver.completeWakefulIntent(intent);
+	}
+
+	protected void playSound(Uri sound) {
+		MediaPlayer mp = new MediaPlayer();
+		try {
+			mp.setDataSource(this, sound);
+			final AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+			if (am.getStreamVolume(AudioManager.STREAM_NOTIFICATION) != 0) {
+				mp.setAudioStreamType(AudioManager.STREAM_NOTIFICATION);
+				mp.setLooping(false);
+				mp.prepare();
+				mp.start();
+			}
+		} catch (IOException e) {
+			Log.e("ChatIntentService", "Failed to play ringtone");
+			e.printStackTrace();
+		}
 	}
 
 	protected void sendNotification(String msg) {
