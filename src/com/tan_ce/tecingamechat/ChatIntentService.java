@@ -54,12 +54,11 @@ public class ChatIntentService extends IntentService {
 							Uri ringtoneUri = Uri.parse(ringtone);
 							playSound(ringtoneUri);
 						}
-					}
 
-					if (prefs.getBoolean("notifications_new_message_vibrate", false)) {
-						// Always vibrate on a new message
-						Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-						v.vibrate(300);
+						if (prefs.getBoolean("notifications_new_message_vibrate", false)) {
+							Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+							v.vibrate(300);
+						}
 					}
 				} catch (Exception e) {
 					Log.w("ChatActivity", "Server pushed invalid message: " + e.getMessage());
